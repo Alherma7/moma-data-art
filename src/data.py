@@ -1,6 +1,10 @@
 import re
+import urllib.request
+from pathlib import Path
 
 import pandas as pd
+
+from . import config
 
 _MEDIUM_CATEGORIES = {
     "painting": ["oil", "acrylic", "watercolor", "tempera", "gouache", "fresco", "enamel", "paint", "color"],
@@ -123,3 +127,22 @@ def clean_artworks(df: pd.DataFrame) -> pd.DataFrame:
         lambda d: pd.Series(classify_decade(d))
     )
     return df
+
+
+def download_raw_data() -> None:
+    """Fetch fresh copies of Artworks.json/Artists.json from MoMA's GitHub repo."""
+    config.DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
+    urllib.request.urlretrieve(config.MOMA_ARTWORKS_URL, config.DATA_RAW_DIR / "Artworks.json")
+    urllib.request.urlretrieve(config.MOMA_ARTISTS_URL, config.DATA_RAW_DIR / "Artists.json")
+
+
+def load_raw_data() -> pd.DataFrame:
+    """Load whatever Artworks.json is currently in data/raw/."""
+    return pd.read_json(config.DATA_RAW_DIR / "Artworks.json")
+
+
+def save_processed(df: pd.DataFrame) -> Path:
+    config.DATA_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    out_path = config.DATA_PROCESSED_DIR / "artworks_clean.parquet"
+    df.to_parquet(out_path)
+    return out_path
