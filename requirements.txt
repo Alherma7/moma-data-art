@@ -1,0 +1,6 @@
+pandas
+numpy
+pillow
+plotly
+pyarrow
+pytest

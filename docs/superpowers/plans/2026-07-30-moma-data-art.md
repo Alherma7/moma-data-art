@@ -1435,12 +1435,17 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -f outputs/site outputs/charts data/raw
+          git add -f outputs/site outputs/charts
           git diff --cached --quiet || git commit -m "chore: scheduled MoMA data refresh"
           git push
 ```
 
-Note: `outputs/` is gitignored (Task 1) so local runs don't pollute git status, but the deployed site needs `outputs/site/` tracked in CI. The `git add -f` here intentionally overrides the ignore rule for this one workflow; this is the only place in the project that does so.
+Note: `outputs/` and `data/raw/` are both gitignored (Task 1) — `Artworks.json` alone is
+~137MB, over GitHub's 100MB per-file push limit, so raw data must never be committed,
+only downloaded fresh each run via `download_raw_data()`. The deployed site still needs
+`outputs/site/` tracked, so this step's `git add -f` deliberately overrides the ignore
+rule for `outputs/site` and `outputs/charts` only — `data/raw` is never added, in CI or
+locally.
 
 - [ ] **Step 2: Validate the workflow syntax**
 
