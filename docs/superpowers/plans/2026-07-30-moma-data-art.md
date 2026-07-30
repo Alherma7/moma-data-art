@@ -225,7 +225,16 @@ git commit -m "chore: scaffold project structure and config"
 
 **Interfaces:**
 - Consumes: `config.DATA_RAW_DIR`, `config.DATA_PROCESSED_DIR` (from Task 1)
-- Produces: `data.classify_medium(medium: str) -> str`, `data.simplify_gender(gender: str) -> str`, `data.extract_nationalities(nationality: str) -> list[str]`, `data.get_region(nationality: str) -> str`, `data.classify_decade(date) -> tuple[str, int | None]`, `data.clean_artworks(df: pd.DataFrame) -> pd.DataFrame` (adds columns `Medium_category`, `Gender_simple`, `Nationality_list`, `Region_list`, `Decade`, `Year_min`) — consumed by `charts.py` (Tasks 4-6) and `build_site.py` (Task 12).
+- Produces: `data.classify_medium(medium: str) -> str`, `data.simplify_gender(genders: list) -> str`, `data.clean_nationalities(nationalities: list) -> list[str]`, `data.get_region(nationality: str) -> str`, `data.classify_decade(date) -> tuple[str, int | None]`, `data.clean_artworks(df: pd.DataFrame) -> pd.DataFrame` (adds columns `Medium_category`, `Gender_simple`, `Nationality_list`, `Region_list`, `Decade`, `Year_min`) — consumed by `charts.py` (Tasks 4-6) and `build_site.py` (Task 12).
+
+**Correction found during implementation:** `Artworks.json` stores `Gender`
+and `Nationality` as lists per constituent (e.g. `["male"]`, `["Austrian"]`,
+`[]`), not as the CSV's single `"(Male)"`/`"(Austrian)"` text field the
+original PRA1 notebook parsed with parenthesis regexes. `simplify_gender`
+and `clean_nationalities` (renamed from `extract_nationalities`) below
+operate on lists accordingly — confirmed by loading the real
+`data/raw/Artworks.json` and inspecting `df["Gender"].apply(type)` /
+`df["Nationality"].apply(type)` before writing the tests.
 
 - [ ] **Step 1: Write the failing tests**
 
