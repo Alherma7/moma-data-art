@@ -48,15 +48,22 @@ def test_clean_artworks_adds_expected_columns():
         "Gender": [["male"]],
         "Nationality": [["American"]],
         "Date": ["1913"],
+        "DateAcquired": ["1996-04-09"],
+        "CreditLine": ["Gift of the artist"],
     })
     cleaned = data.clean_artworks(df)
     for column in [
         "Medium_category", "Gender_simple", "Nationality_list",
         "Region_list", "Decade", "Year_min",
+        "Credit_category", "Num_participants", "Decade_acquired", "Year_acquired",
     ]:
         assert column in cleaned.columns
     assert cleaned.loc[0, "Medium_category"] == "painting"
     assert cleaned.loc[0, "Decade"] == "1910s"
+    assert cleaned.loc[0, "Credit_category"] == "donated/gifts"
+    assert cleaned.loc[0, "Num_participants"] == 1
+    assert cleaned.loc[0, "Decade_acquired"] == "1990s"
+    assert cleaned.loc[0, "Year_acquired"] == 1996
 
 
 def test_classify_credit_matches_known_keywords():

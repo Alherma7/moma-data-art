@@ -154,6 +154,11 @@ def clean_artworks(df: pd.DataFrame) -> pd.DataFrame:
     df[["Decade", "Year_min"]] = df["Date"].apply(
         lambda d: pd.Series(classify_decade(d))
     )
+    df["Credit_category"] = df["CreditLine"].apply(classify_credit)
+    df["Num_participants"] = df["Gender"].apply(count_participants)
+    df[["Decade_acquired", "Year_acquired"]] = df["DateAcquired"].apply(
+        lambda d: pd.Series(classify_decade(d))
+    )
     return df
 
 
