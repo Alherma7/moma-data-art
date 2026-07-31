@@ -65,3 +65,10 @@ def test_classify_credit_matches_known_keywords():
     assert data.classify_credit("Mrs. Simon Guggenheim Fund") == "fund/institutions"
     assert data.classify_credit(None) == "other/unknown"
     assert data.classify_credit("Totally unrecognized text") == "other/unknown"
+
+
+def test_count_participants_counts_list_length():
+    assert data.count_participants(["male", "female"]) == 2
+    assert data.count_participants(["male"]) == 1
+    assert data.count_participants([]) == 0
+    assert data.count_participants(None) == 0

@@ -68,6 +68,14 @@ def classify_credit(credit_line) -> str:
     return "other/unknown"
 
 
+def count_participants(genders) -> int:
+    """Number of constituents credited on an artwork — Artworks.json's
+    Gender field is a list with one entry per credited artist, so its
+    length is the participant count directly (no regex parsing needed,
+    unlike the original CSV-based notebook's count_participants())."""
+    return len(genders) if isinstance(genders, list) else 0
+
+
 def simplify_gender(genders) -> str:
     """Collapse MoMA's per-constituent Gender list to male/female/other/mixed/unknown.
 
