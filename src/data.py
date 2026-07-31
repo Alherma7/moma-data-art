@@ -138,7 +138,7 @@ def download_raw_data() -> None:
 
 def load_raw_data() -> pd.DataFrame:
     """Load whatever Artworks.json is currently in data/raw/."""
-    return pd.read_json(config.DATA_RAW_DIR / "Artworks.json")
+    return pd.read_json(config.DATA_RAW_DIR / "Artworks.json", convert_dates=False)
 
 
 def save_processed(df: pd.DataFrame) -> Path:
