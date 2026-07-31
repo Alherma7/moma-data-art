@@ -57,3 +57,11 @@ def test_clean_artworks_adds_expected_columns():
         assert column in cleaned.columns
     assert cleaned.loc[0, "Medium_category"] == "painting"
     assert cleaned.loc[0, "Decade"] == "1910s"
+
+
+def test_classify_credit_matches_known_keywords():
+    assert data.classify_credit("Gift of the artist") == "donated/gifts"
+    assert data.classify_credit("Purchase") == "purchase/acquired"
+    assert data.classify_credit("Mrs. Simon Guggenheim Fund") == "fund/institutions"
+    assert data.classify_credit(None) == "other/unknown"
+    assert data.classify_credit("Totally unrecognized text") == "other/unknown"

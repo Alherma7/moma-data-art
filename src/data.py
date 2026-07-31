@@ -30,6 +30,13 @@ _REGION_MAP = {
     "Oceania": ["Australian", "New Zealander"],
 }
 
+_CREDIT_CATEGORIES = {
+    "fund/institutions": ["fund", "foundation", "endowment", "charitable trust", "council", "university", "museum", "comitte"],
+    "purchase/acquired": ["purchase", "puchase", "acquired", "acquisition", "exchange", "transferred", "collection", "commissioned"],
+    "donated/gifts": ["donated", "donor", "gift", "giff", "given", "generosity", "courtesy", "bequest", "estate", "testamentary"],
+    "individual": ["j. b. neumann", "abraham", "blanchette", "mr.", "ms.", "individual"],
+}
+
 _DECADE_PATTERN = re.compile(r"[1-2][0-9]{3}")
 
 
@@ -46,6 +53,19 @@ def classify_medium(medium) -> str:
         if any(keyword in m for keyword in keywords):
             return category
     return "other"
+
+
+def classify_credit(credit_line) -> str:
+    """Bucket a raw CreditLine string into a coarse acquisition-source
+    category. Ported from the original PRA1 notebook's classify_credit(),
+    validated there against this same field."""
+    if pd.isna(credit_line):
+        return "other/unknown"
+    c = credit_line.lower().strip()
+    for category, keywords in _CREDIT_CATEGORIES.items():
+        if any(keyword in c for keyword in keywords):
+            return category
+    return "other/unknown"
 
 
 def simplify_gender(genders) -> str:
