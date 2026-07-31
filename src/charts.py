@@ -53,3 +53,25 @@ def demoiselles_radar(df):
         )
     fig.update_layout(polar=dict(bgcolor=palette["background"]), showlegend=True)
     return fig
+
+
+def dance_circular_bar(df):
+    """Ring of colored bars (one per decade), echoing the circle of 5
+    dancers and Matisse's 3 flat colors."""
+    palette = config.PALETTES["dance"]
+    colors = [palette["orange"], palette["green"], palette["blue"]]
+    counts = df["Decade"].value_counts().sort_index()
+    counts = counts[counts.index != "unknown"]
+
+    fig = go.Figure(
+        go.Barpolar(
+            r=counts.values,
+            theta=counts.index,
+            marker_color=[colors[i % len(colors)] for i in range(len(counts))],
+            marker_line_color="white",
+            marker_line_width=1,
+            opacity=0.9,
+        )
+    )
+    fig.update_layout(polar=dict(radialaxis=dict(showticklabels=False)))
+    return fig
