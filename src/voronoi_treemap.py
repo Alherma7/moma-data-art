@@ -18,7 +18,13 @@ def sample_points(weights: dict, rng: random.Random, total_points: int = 2000) -
     for g in by_fractional_part[:remainder]:
         counts[g] += 1
 
+    zero_groups = [g for g in groups if counts[g] == 0]
+    for g in zero_groups:
+        donor = max(groups, key=lambda h: counts[h])
+        counts[donor] -= 1
+        counts[g] = 1
+
     return {
-        g: [(rng.random(), rng.random()) for _ in range(max(1, counts[g]))]
+        g: [(rng.random(), rng.random()) for _ in range(counts[g])]
         for g in groups
     }

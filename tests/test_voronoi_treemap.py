@@ -19,3 +19,4 @@ def test_sample_points_gives_every_group_at_least_one_point():
     rng = random.Random(42)
     points = voronoi_treemap.sample_points({"a": 1.0, "b": 0.001}, rng, total_points=10)
     assert len(points["b"]) >= 1
+    assert sum(len(v) for v in points.values()) == 10
