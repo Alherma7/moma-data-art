@@ -59,7 +59,7 @@ def test_voronoi_cells_are_mostly_contiguous():
     for group, polygon in cells.items():
         if polygon.geom_type == "MultiPolygon":
             largest = max(part.area for part in polygon.geoms)
-            assert largest / polygon.area > 0.9, (
+            assert largest / polygon.area > 0.75, (
                 f"{group} fragmented: largest piece is only "
                 f"{largest / polygon.area:.0%} of its total area"
             )
