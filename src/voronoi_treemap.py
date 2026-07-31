@@ -7,6 +7,12 @@ from shapely.geometry import Polygon, box
 from shapely.ops import unary_union
 
 _BOUNDS = box(0, 0, 1, 1)
+_CLUSTER_AREA_BUDGET = 0.3  # total disk area across ALL groups combined, as
+# a share of the unit square. Fixed regardless of group count -- since
+# sum(share) == 1 for any number of groups, this keeps total packing needs
+# constant. Area proportionality is approximate by design: exact weighted-Voronoi-treemap
+# area matching would need an iterative algorithm (e.g., Balzer & Deussen); this
+# scales cluster radius/point-count with weight as a practical approximation instead.
 
 
 def sample_points(weights: dict, rng: random.Random, total_points: int = 2000) -> dict:
@@ -34,18 +40,19 @@ def sample_points(weights: dict, rng: random.Random, total_points: int = 2000) -
         counts[donor] -= 1
         counts[g] = 1
 
+    k = math.sqrt(_CLUSTER_AREA_BUDGET / math.pi)
     radii = {
-        g: 0.08 + 0.42 * math.sqrt(weights[g] / total_weight)
+        g: max(0.02, k * math.sqrt(weights[g] / total_weight))
         for g in groups
     }
 
     anchors = {}
     for g in groups:
         candidate = (0.5, 0.5)
-        for _attempt in range(200):
+        for _attempt in range(500):
             candidate = (rng.uniform(0.1, 0.9), rng.uniform(0.1, 0.9))
             if all(
-                math.dist(candidate, anchors[h]) >= 0.5 * (radii[g] + radii[h])
+                math.dist(candidate, anchors[h]) >= radii[g] + radii[h]
                 for h in anchors
             ):
                 break
