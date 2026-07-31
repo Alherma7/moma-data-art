@@ -22,10 +22,37 @@ def test_sample_points_gives_every_group_at_least_one_point():
     assert sum(len(v) for v in points.values()) == 10
 
 
+def test_sample_points_repairs_every_zero_group_including_new_zeros_created_by_donation():
+    # Regression test for a latent bug: the original single-pass donor loop
+    # computed zero_groups once, so a donor that itself got decremented from
+    # 1 to 0 during the pass was never repaired. With total_points=3 and 5
+    # groups, it's impossible for every group to reach count >= 1, so we
+    # instead assert the loop terminates cleanly with no negative counts
+    # and the total still sums to total_points (rather than crashing or
+    # leaving a group at a negative count).
+    rng = random.Random(42)
+    points = voronoi_treemap.sample_points(
+        {"a": 5, "b": 4, "c": 3, "d": 2, "e": 1}, rng, total_points=3
+    )
+    counts = {g: len(v) for g, v in points.items()}
+    assert sum(counts.values()) == 3
+    assert all(c >= 0 for c in counts.values())
+
+
+def test_sample_points_handles_empty_weights():
+    rng = random.Random(42)
+    assert voronoi_treemap.sample_points({}, rng, total_points=100) == {}
+
+
 import pytest
 
 
-def test_voronoi_cells_returns_one_polygon_per_group():
+def test_voronoi_cells_handles_empty_points():
+    assert voronoi_treemap.voronoi_cells({}) == {}
+    assert voronoi_treemap.voronoi_cells({"a": [], "b": []}) == {}
+
+
+def test_voronoi_cells_returns_a_valid_geometry_per_group():
     rng = random.Random(42)
     points = voronoi_treemap.sample_points({"a": 1.0, "b": 1.0}, rng, total_points=200)
     cells = voronoi_treemap.voronoi_cells(points)

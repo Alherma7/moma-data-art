@@ -9,8 +9,10 @@ from . import config, voronoi_treemap
 
 def mondrian_treemap(df):
     """Treemap of artwork counts by acquisition decade and credit category,
-    colored to evoke Mondrian's grid of primary-color blocks: the 3 most
-    active decades get red/blue/yellow, every other decade gets black."""
+    colored to evoke Mondrian's grid of primary-color blocks: the 5
+    most-acquired decades, sorted chronologically; the earliest 3 of those
+    5 get red/blue/yellow, the rest (including every decade outside the
+    top 5) get black."""
     palette = config.PALETTES["mondrian"]
     known = df[df["Decade_acquired"] != "unknown"]
     counts = (
@@ -51,7 +53,9 @@ def _interpolate_hex(color_a: str, color_b: str, t: float) -> str:
 
 
 def demoiselles_voronoi(df):
-    """Voronoi treemap with one cell per decade, sized by artwork count and
+    """Voronoi treemap with one cell per decade (decades below 3% of total
+    count are pooled into a single "Other" cell, to avoid the area-encoding
+    distortion sparse decades cause otherwise), sized by artwork count and
     colored by gender ratio (pale pink = balanced/female-leaning, dark
     maroon = male-dominated), evoking the painting's fragmented cubist
     planes. A decade's merged cell is usually one contiguous polygon but
@@ -59,20 +63,33 @@ def demoiselles_voronoi(df):
     each fragment is rendered as its own trace sharing the decade's name,
     color, and legend entry."""
     palette = config.PALETTES["demoiselles"]
-    known = df[df["Decade"] != "unknown"]
-    weights = known["Decade"].value_counts().to_dict()
+    known = df[df["Decade"] != "unknown"].copy()
+    if known.empty:
+        return go.Figure()
+
+    decade_counts = known["Decade"].value_counts()
+    total_count = decade_counts.sum()
+    small_decades = decade_counts[decade_counts / total_count < 0.03].index
+    known["Decade_grouped"] = known["Decade"].where(
+        ~known["Decade"].isin(small_decades), "Other"
+    )
+
+    weights = known["Decade_grouped"].value_counts().to_dict()
 
     rng = random.Random(config.RANDOM_STATE)
     points = voronoi_treemap.sample_points(weights, rng)
     cells = voronoi_treemap.voronoi_cells(points)
 
     fig = go.Figure()
-    for decade, geometry in cells.items():
-        subset = known[known["Decade"] == decade]
+    for group, geometry in cells.items():
+        subset = known[known["Decade_grouped"] == group]
         male = (subset["Gender_simple"] == "male").sum()
         female = (subset["Gender_simple"] == "female").sum()
-        ratio = male / (male + female) if (male + female) > 0 else 0.5
-        color = _interpolate_hex(palette["pink"], palette["brown"], ratio)
+        if male + female == 0:
+            color = palette["cream"]
+        else:
+            ratio = male / (male + female)
+            color = _interpolate_hex(palette["pink"], palette["brown"], ratio)
 
         polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
         for i, polygon in enumerate(polygons):
@@ -84,8 +101,8 @@ def demoiselles_voronoi(df):
                     fill="toself",
                     fillcolor=color,
                     line=dict(color=palette["terracotta"], width=1),
-                    name=decade,
-                    legendgroup=decade,
+                    name=group,
+                    legendgroup=group,
                     showlegend=(i == 0),
                     mode="lines",
                 )
