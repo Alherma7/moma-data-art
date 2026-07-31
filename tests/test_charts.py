@@ -29,3 +29,11 @@ def test_demoiselles_voronoi_returns_one_trace_per_decade():
     assert isinstance(fig, go.Figure)
     decade_names_in_figure = {trace.name for trace in fig.data}
     assert decade_names_in_figure == set(df["Decade"].unique())
+
+
+def test_dance_scatter_returns_one_point_per_group_work_decade():
+    df = _sample_df()
+    fig = charts.dance_scatter(df)
+    assert isinstance(fig, go.Figure)
+    expected_decades = df[df["Num_participants"] >= 2]["Decade"].nunique()
+    assert len(fig.data[0].x) == expected_decades

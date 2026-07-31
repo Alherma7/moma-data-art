@@ -2,6 +2,7 @@ import random
 
 import plotly.express as px
 import plotly.graph_objects as go
+from PIL import Image
 
 from . import config, voronoi_treemap
 
@@ -98,23 +99,56 @@ def demoiselles_voronoi(df):
     return fig
 
 
-def dance_circular_bar(df):
-    """Ring of colored bars (one per decade), echoing the circle of 5
-    dancers and Matisse's 3 flat colors."""
+def dance_scatter(df):
+    """Scatter of group-authored-work count vs. total participants per
+    decade, plotted over the Dance I painting as a background image,
+    echoing Matisse's flat colors and the ring of collaborating dancers."""
     palette = config.PALETTES["dance"]
     colors = [palette["orange"], palette["green"], palette["blue"]]
-    counts = df["Decade"].value_counts().sort_index()
-    counts = counts[counts.index != "unknown"]
+
+    grouped = df[(df["Decade"] != "unknown") & (df["Num_participants"] >= 2)]
+    by_decade = (
+        grouped.groupby("Decade")
+        .agg(num_group_works=("Decade", "size"), num_participants=("Num_participants", "sum"))
+        .reset_index()
+    )
+    by_decade = by_decade.sort_values(
+        "Decade", key=lambda s: s.str.rstrip("s").astype(int)
+    )
+
+    image = Image.open(config.GEOMETRIZE_CONFIGS["dance"]["image"])
 
     fig = go.Figure(
-        go.Barpolar(
-            r=counts.values,
-            theta=counts.index,
-            marker_color=[colors[i % len(colors)] for i in range(len(counts))],
-            marker_line_color="white",
-            marker_line_width=1,
+        go.Scatter(
+            x=by_decade["num_group_works"],
+            y=by_decade["num_participants"],
+            mode="markers",
+            marker=dict(
+                size=14,
+                color=[colors[i % len(colors)] for i in range(len(by_decade))],
+                line=dict(color="white", width=1),
+            ),
+            text=by_decade["Decade"],
+            hovertemplate="%{text}<br>Group works: %{x}<br>Participants: %{y}<extra></extra>",
+        )
+    )
+    fig.add_layout_image(
+        dict(
+            source=image,
+            xref="paper",
+            yref="paper",
+            x=0,
+            y=1,
+            sizex=1,
+            sizey=1,
+            sizing="stretch",
+            layer="below",
             opacity=0.9,
         )
     )
-    fig.update_layout(polar=dict(radialaxis=dict(showticklabels=False)))
+    fig.update_layout(
+        xaxis=dict(title="Group-authored works"),
+        yaxis=dict(title="Total participants"),
+        margin=dict(t=20, l=60, r=20, b=40),
+    )
     return fig
