@@ -92,7 +92,7 @@ treemap:
 1. `sample_points(weights: dict[str, float], rng, total_points: int = 2000) -> dict[str, list[tuple[float, float]]]`:
    for each group (decade), sample a number of random points within a unit
    square proportional to its weight (share of total).
-2. `voronoi_cells(points: dict[str, list[tuple[float, float]]]) -> dict[str, shapely.Polygon]`:
+2. `voronoi_cells(points: dict[str, list[tuple[float, float]]]) -> dict[str, Polygon | MultiPolygon]`:
    run `scipy.spatial.Voronoi` on the *combined* point set (all groups
    together, each site tagged with its group), clip infinite/boundary
    cells to the unit square, then union all cells belonging to the same

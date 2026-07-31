@@ -325,7 +325,7 @@ git commit -m "feat: add weighted point sampling for the Voronoi treemap"
 
 **Interfaces:**
 - Consumes: `sample_points` output (Task 4).
-- Produces: `voronoi_treemap.voronoi_cells(points: dict[str, list[tuple[float, float]]]) -> dict[str, shapely.geometry.Polygon]` — consumed by Task 7 (`demoiselles_voronoi`).
+- Produces: `voronoi_treemap.voronoi_cells(points: dict[str, list[tuple[float, float]]]) -> dict[str, shapely.geometry.Polygon | shapely.geometry.MultiPolygon]` — consumed by Task 7 (`demoiselles_voronoi`).
 
 - [ ] **Step 1: Add `scipy` and `shapely` to `requirements.txt`**
 
