@@ -49,3 +49,17 @@ def test_voronoi_cells_cover_the_unit_square_without_gaps():
     cells = voronoi_treemap.voronoi_cells(points)
     total_area = sum(polygon.area for polygon in cells.values())
     assert total_area == pytest.approx(1.0, abs=0.02)
+
+
+def test_voronoi_cells_are_mostly_contiguous():
+    rng = random.Random(42)
+    weights = {"a": 1.0, "b": 1.0, "c": 1.0, "d": 1.0, "e": 1.0}
+    points = voronoi_treemap.sample_points(weights, rng, total_points=1000)
+    cells = voronoi_treemap.voronoi_cells(points)
+    for group, polygon in cells.items():
+        if polygon.geom_type == "MultiPolygon":
+            largest = max(part.area for part in polygon.geoms)
+            assert largest / polygon.area > 0.9, (
+                f"{group} fragmented: largest piece is only "
+                f"{largest / polygon.area:.0%} of its total area"
+            )

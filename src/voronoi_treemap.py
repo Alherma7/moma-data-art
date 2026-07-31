@@ -1,3 +1,4 @@
+import math
 import random
 
 import numpy as np
@@ -9,15 +10,17 @@ _BOUNDS = box(0, 0, 1, 1)
 
 
 def sample_points(weights: dict, rng: random.Random, total_points: int = 2000) -> dict:
-    """Sample points within the unit square [0,1]x[0,1], allocated to each
-    group proportional to its weight (largest-remainder method, so counts
-    sum to exactly total_points), with every group guaranteed at least 1
-    point so it still produces a valid Voronoi cell downstream."""
+    """Sample points clustered per group, so each group occupies a spatially
+    contiguous region rather than being scattered across the whole unit
+    square. Cluster radius scales with sqrt(weight share) so cluster AREA
+    (not just point count) tracks each group's target proportion, and point
+    count still scales with weight too (largest-remainder allocation),
+    keeping point density comparable across differently-sized clusters."""
     groups = list(weights.keys())
     total_weight = sum(weights.values())
+
     raw_counts = {g: total_points * weights[g] / total_weight for g in groups}
     counts = {g: int(raw_counts[g]) for g in groups}
-
     remainder = total_points - sum(counts.values())
     by_fractional_part = sorted(
         groups, key=lambda g: raw_counts[g] - counts[g], reverse=True
@@ -31,8 +34,31 @@ def sample_points(weights: dict, rng: random.Random, total_points: int = 2000) -
         counts[donor] -= 1
         counts[g] = 1
 
+    radii = {
+        g: 0.08 + 0.42 * math.sqrt(weights[g] / total_weight)
+        for g in groups
+    }
+
+    anchors = {}
+    for g in groups:
+        candidate = (0.5, 0.5)
+        for _attempt in range(200):
+            candidate = (rng.uniform(0.1, 0.9), rng.uniform(0.1, 0.9))
+            if all(
+                math.dist(candidate, anchors[h]) >= 0.5 * (radii[g] + radii[h])
+                for h in anchors
+            ):
+                break
+        anchors[g] = candidate
+
     return {
-        g: [(rng.random(), rng.random()) for _ in range(counts[g])]
+        g: [
+            (
+                min(1.0, max(0.0, rng.gauss(anchors[g][0], radii[g] / 2))),
+                min(1.0, max(0.0, rng.gauss(anchors[g][1], radii[g] / 2))),
+            )
+            for _ in range(counts[g])
+        ]
         for g in groups
     }
 
