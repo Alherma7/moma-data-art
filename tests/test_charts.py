@@ -21,3 +21,11 @@ def test_mondrian_treemap_returns_figure_with_data():
     fig = charts.mondrian_treemap(_sample_df())
     assert isinstance(fig, go.Figure)
     assert len(fig.data) > 0
+
+
+def test_demoiselles_voronoi_returns_one_trace_per_decade():
+    df = _sample_df()
+    fig = charts.demoiselles_voronoi(df)
+    assert isinstance(fig, go.Figure)
+    decade_names_in_figure = {trace.name for trace in fig.data}
+    assert decade_names_in_figure == set(df["Decade"].unique())

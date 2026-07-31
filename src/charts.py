@@ -1,7 +1,9 @@
+import random
+
 import plotly.express as px
 import plotly.graph_objects as go
 
-from . import config
+from . import config, voronoi_treemap
 
 
 def mondrian_treemap(df):
@@ -38,32 +40,61 @@ def mondrian_treemap(df):
     return fig
 
 
-def demoiselles_radar(df):
-    """Overlapping, semi-transparent radar traces (one per region) across
-    the top departments, evoking the fragmented cubist planes of the
-    painting's 5 figures."""
+def _interpolate_hex(color_a: str, color_b: str, t: float) -> str:
+    """Linearly interpolate between two '#RRGGBB' colors at t in [0, 1]."""
+    t = max(0.0, min(1.0, t))
+    a = tuple(int(color_a[i:i + 2], 16) for i in (1, 3, 5))
+    b = tuple(int(color_b[i:i + 2], 16) for i in (1, 3, 5))
+    mixed = tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
+    return "#{:02X}{:02X}{:02X}".format(*mixed)
+
+
+def demoiselles_voronoi(df):
+    """Voronoi treemap with one cell per decade, sized by artwork count and
+    colored by gender ratio (pale pink = balanced/female-leaning, dark
+    maroon = male-dominated), evoking the painting's fragmented cubist
+    planes. A decade's merged cell is usually one contiguous polygon but
+    may legitimately come back as a few small fragments (MultiPolygon) —
+    each fragment is rendered as its own trace sharing the decade's name,
+    color, and legend entry."""
     palette = config.PALETTES["demoiselles"]
-    top_departments = df["Department"].value_counts().nlargest(5).index.tolist()
-    exploded = df.explode("Region_list")
-    top_regions = exploded["Region_list"].value_counts().nlargest(4).index.tolist()
-    colors = [palette["terracotta"], palette["pink"], palette["cream"], palette["brown"]]
+    known = df[df["Decade"] != "unknown"]
+    weights = known["Decade"].value_counts().to_dict()
+
+    rng = random.Random(config.RANDOM_STATE)
+    points = voronoi_treemap.sample_points(weights, rng)
+    cells = voronoi_treemap.voronoi_cells(points)
 
     fig = go.Figure()
-    for region, color in zip(top_regions, colors):
-        subset = exploded[exploded["Region_list"] == region]
-        counts = subset["Department"].value_counts().reindex(top_departments, fill_value=0)
-        fig.add_trace(
-            go.Scatterpolar(
-                r=counts.values,
-                theta=top_departments,
-                fill="toself",
-                name=region,
-                opacity=0.55,
-                line=dict(color=color),
-                fillcolor=color,
+    for decade, geometry in cells.items():
+        subset = known[known["Decade"] == decade]
+        male = (subset["Gender_simple"] == "male").sum()
+        female = (subset["Gender_simple"] == "female").sum()
+        ratio = male / (male + female) if (male + female) > 0 else 0.5
+        color = _interpolate_hex(palette["pink"], palette["brown"], ratio)
+
+        polygons = list(geometry.geoms) if geometry.geom_type == "MultiPolygon" else [geometry]
+        for i, polygon in enumerate(polygons):
+            x, y = polygon.exterior.xy
+            fig.add_trace(
+                go.Scatter(
+                    x=list(x),
+                    y=list(y),
+                    fill="toself",
+                    fillcolor=color,
+                    line=dict(color=palette["terracotta"], width=1),
+                    name=decade,
+                    legendgroup=decade,
+                    showlegend=(i == 0),
+                    mode="lines",
+                )
             )
-        )
-    fig.update_layout(polar=dict(bgcolor=palette["background"]), showlegend=True)
+    fig.update_layout(
+        plot_bgcolor=palette["background"],
+        xaxis=dict(visible=False),
+        yaxis=dict(visible=False, scaleanchor="x"),
+        showlegend=True,
+    )
     return fig
 
 
