@@ -5,3 +5,4 @@ outputs/
 data/processed/
 data/raw/
 notebooks/*.html
+.venv_tmp/
