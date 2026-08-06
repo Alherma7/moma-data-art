@@ -49,7 +49,7 @@ def test_mondrian_treemap_assigns_most_acquired_decade_to_largest_rectangle():
     n_background = len(mondrian_geometry.MONDRIAN_BACKGROUND_RECTANGLES)
     largest_trace = fig.data[2 * n_background]  # first colored-rectangle trace
     assert largest_trace.x[0] == largest_rect["x0"]
-    assert "1960s" in largest_trace.hovertemplate
+    assert "1960s" in largest_trace.text
 
 
 def test_mondrian_treemap_unassigned_rectangles_have_empty_hover():
@@ -58,5 +58,23 @@ def test_mondrian_treemap_unassigned_rectangles_have_empty_hover():
     n_background = len(mondrian_geometry.MONDRIAN_BACKGROUND_RECTANGLES)
     n_colored = len(mondrian_geometry.MONDRIAN_RECTANGLES)
     colored_traces = fig.data[2 * n_background: 2 * n_background + n_colored]
-    empty_hover_traces = [t for t in colored_traces if t.hovertemplate == "<extra></extra>"]
+    empty_hover_traces = [t for t in colored_traces if t.hoverinfo == "skip"]
     assert len(empty_hover_traces) == n_colored - 1
+
+
+def test_mondrian_treemap_labels_fill_hover_via_text_not_hovertemplate():
+    """plotly.js forces ``hovertemplate: false`` for ``hoveron='fills'``
+    hovers and labels them from the trace's scalar ``text`` instead, so a
+    hovertemplate here would silently render as "trace N"."""
+    df = pd.DataFrame({"Decade_acquired": ["1960s"] * 5 + ["1970s"] * 2})
+    fig = charts.mondrian_treemap(df)
+    n_background = len(mondrian_geometry.MONDRIAN_BACKGROUND_RECTANGLES)
+    n_colored = len(mondrian_geometry.MONDRIAN_RECTANGLES)
+    colored_traces = fig.data[2 * n_background: 2 * n_background + n_colored]
+    labelled = [t for t in colored_traces if t.hoverinfo == "text"]
+    assert len(labelled) == 2
+    for trace in labelled:
+        assert trace.hovertemplate is None
+        assert trace.hoveron == "fills"
+        assert isinstance(trace.text, str)
+        assert trace.name == ""

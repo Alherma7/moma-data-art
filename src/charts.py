@@ -5,18 +5,26 @@ from . import config, mondrian_geometry
 GRID_LINE_WIDTH = 5
 
 
-def _rectangle_trace(rect, palette, hovertemplate="<extra></extra>", text=None):
+def _rectangle_trace(rect, palette, hovertext=None):
+    """Rectangle outline + fill. Hover is driven by ``hoveron='fills'`` so
+    the whole interior is hoverable, not just the corner vertices. Note
+    that plotly.js *ignores* ``hovertemplate`` on a fill hover (it forces
+    ``hovertemplate: false`` internally and falls back to the trace's
+    scalar ``text``, or to the trace name if there is none -- which is
+    why a hovertemplate here silently renders as "trace N"). So the label
+    has to be passed as a scalar ``text`` with ``hoverinfo='text'``."""
     x0, y0, x1, y1 = rect["x0"], rect["y0"], rect["x1"], rect["y1"]
-    points = [x0, x1, x1, x0, x0]
     return go.Scatter(
-        x=points,
+        x=[x0, x1, x1, x0, x0],
         y=[y0, y0, y1, y1, y0],
         fill="toself",
         fillcolor=palette[rect["color"]],
         line=dict(color=palette["black"], width=GRID_LINE_WIDTH),
         mode="lines",
-        hovertemplate=hovertemplate,
-        text=[text] * len(points) if text is not None else None,
+        hoveron="fills",
+        name="",
+        text=hovertext,
+        hoverinfo="text" if hovertext else "skip",
         showlegend=False,
     )
 
@@ -105,12 +113,10 @@ def mondrian_treemap(df):
     for rect, assignment in zip(rectangles_sorted, assignments):
         if assignment is not None:
             decade, count = assignment
-            hovertemplate = f"{decade}<br>%{{text}} artworks<extra></extra>"
-            text = str(count)
+            hovertext = f"{decade}<br>{count} artworks"
         else:
-            hovertemplate = "<extra></extra>"
-            text = None
-        fig.add_trace(_rectangle_trace(rect, palette, hovertemplate=hovertemplate, text=text))
+            hovertext = None
+        fig.add_trace(_rectangle_trace(rect, palette, hovertext=hovertext))
     fig.add_trace(_segments_trace(decorative_segments, palette["black"]))
 
     fig.update_layout(
