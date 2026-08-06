@@ -24,4 +24,3 @@ Decade_acquired) before building further chart functions.
 
 - [ ] Redesign Demoiselles / Dance I with the same real-geometry technique
 - [ ] `src/build_site.py` + GitHub Pages deployment
-- [ ] Link this repo from the Alherma7 profile README
