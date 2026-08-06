@@ -75,9 +75,13 @@ rectangles with no assigned decade get minimal/empty hover.
 
 ## Config
 
-`config.PAINTING_IMAGES`: `{painting: {"image": Path}}`, one entry per
-painting's reference image path — used by `mondrian_treemap` (new) and
-`dance_scatter` (existing, unchanged behavior).
+No per-painting image-path config is needed — `mondrian_treemap` is pure
+vector (no background image). `demoiselles_voronoi`/`dance_scatter` and
+their supporting code (`src/voronoi_treemap.py`, the old
+`GEOMETRIZE_CONFIGS` dict, the `demoiselles`/`dance` palette entries) were
+removed entirely rather than kept or renamed — they served only the two
+charts being deferred to a future redesign, and were unused dead weight
+otherwise.
 
 ## Cleanup
 
@@ -88,22 +92,36 @@ Its dedicated test in `tests/test_data.py`
 (`test_classify_credit_matches_known_keywords`) and the `Credit_category`
 fixture/assertions in the `clean_artworks` tests are removed with it.
 
+## Development workflow
+
+Notebook-first, not direct-to-`src/` TDD: the geometry, the assignment
+logic, and the final render are each built and checked interactively in
+`notebooks/03_mondrian_prototyping.ipynb` — the user runs every cell
+themselves and confirms it before the next piece is built. Only once all
+three are validated does the code move into `src/mondrian_geometry.py`
+and `src/charts.py`, gaining proper pytest tests at that point.
+`notebooks/02_chart_prototyping.ipynb` is the final check afterward,
+exercising the graduated `charts.mondrian_treemap` against the real
+dataset one more time.
+
 ## Validation and testing
 
-- **Visual gate first**: before any data is wired in, `MONDRIAN_RECTANGLES`
-  is rendered standalone (painted colors only, no hover data) in
-  `notebooks/02_chart_prototyping.ipynb`. The user runs this cell and
-  confirms it reads as the source image before data logic is built on top
-  of it.
-- `tests/test_mondrian_geometry.py` (new): every entry in
-  `MONDRIAN_RECTANGLES` has `0 <= x0 < x1 <= 1`, `0 <= y0 < y1 <= 1`, and a
-  `color` that exists in `config.PALETTES["mondrian"]`.
-- `tests/test_charts.py`: a new test for the rank-based assignment logic —
-  given a small known set of decade counts and a small known set of
-  rectangle areas, asserts the correct decade lands on each rectangle
-  rank, that excess decades collapse into `"Other"`, and that excess
-  rectangles get no assigned decade. Plus: `mondrian_treemap(df)` returns
-  a `go.Figure` with one trace per digitized rectangle.
+- **Visual gate first**: before the assignment logic or real data is
+  introduced, `MONDRIAN_RECTANGLES` is rendered standalone (painted
+  colors only, no hover data) in `notebooks/03_mondrian_prototyping.ipynb`.
+  The user runs this cell and confirms it reads as the source image
+  before anything else is built on top of it.
+- `tests/test_mondrian_geometry.py` (new, written at graduation time):
+  every entry in `MONDRIAN_RECTANGLES` has `0 <= x0 < x1 <= 1`,
+  `0 <= y0 < y1 <= 1`, and a `color` that exists in
+  `config.PALETTES["mondrian"]`.
+- `tests/test_charts.py` (new, written at graduation time): the
+  rank-based assignment logic — given a small known set of decade counts
+  and a small known set of rectangle areas, asserts the correct decade
+  lands on each rectangle rank, that excess decades collapse into
+  `"Other"`, and that excess rectangles get no assigned decade. Plus:
+  `mondrian_treemap(df)` returns a `go.Figure` with one trace per
+  digitized rectangle.
 
 ## Migration notes
 
@@ -112,4 +130,4 @@ inspection prompt is updated to describe the new hover-based inspection
 ("does each rectangle's hover show a plausible decade/count, and does the
 overall shape still read as the source composition?"); the code cell is
 unchanged (`charts.mondrian_treemap(cleaned).show()` still works — same
-function name and signature).
+function name and signature once graduated).

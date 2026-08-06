@@ -4,5 +4,3 @@ pillow
 plotly
 pyarrow
 pytest
-scipy
-shapely

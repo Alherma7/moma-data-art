@@ -15,8 +15,8 @@ container for real MoMA collection data, revealed on hover. Mondrian spec:
 - [ ] Scheduled data refresh
 
 `notebooks/01_eda.ipynb` is ready — open it in Jupyter and run the cells to
-review the real distributions (Medium_category, Gender_simple, Region_list,
-Decade) before building further chart functions.
+review the real distributions (Medium_category, Region_list,
+Decade_acquired) before building further chart functions.
 
 ## Next steps
 

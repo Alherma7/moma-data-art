@@ -19,40 +19,4 @@ PALETTES = {
         "black": "#111111",
         "background": "#F2F0E6",
     },
-    "demoiselles": {
-        "terracotta": "#B5651D",
-        "pink": "#D9A5A0",
-        "cream": "#E8DCC8",
-        "brown": "#3B2A20",
-        "background": "#EFE6D8",
-    },
-    "dance": {
-        "orange": "#E2725B",
-        "green": "#5C8A3A",
-        "blue": "#3C6997",
-    },
-}
-
-GEOMETRIZE_CONFIGS = {
-    "mondrian": {
-        "image": IMAGES_DIR / "mondrian_composition.jpg",
-        "shape_kind": "rectangle",
-        "n_shapes": 120,
-        "n_candidates": 60,
-        "n_refine": 20,
-    },
-    "demoiselles": {
-        "image": IMAGES_DIR / "les_demoiselles_davignon.png",
-        "shape_kind": "triangle",
-        "n_shapes": 200,
-        "n_candidates": 60,
-        "n_refine": 20,
-    },
-    "dance": {
-        "image": IMAGES_DIR / "dance_i.png",
-        "shape_kind": "ellipse",
-        "n_shapes": 150,
-        "n_candidates": 60,
-        "n_refine": 20,
-    },
 }
