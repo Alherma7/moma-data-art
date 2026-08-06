@@ -7,12 +7,18 @@ container for real MoMA collection data, revealed on hover. Mondrian spec:
 
 ![Mondrian treemap, hovering the largest rectangle to reveal its decade and artwork count](docs/screenshots/mondrian_treemap.png)
 
+Demoiselles d'Avignon redesign in progress — a Voronoi tessellation over
+the painting's own canvas, faces excluded as decoration. Spec:
+`docs/superpowers/specs/2026-08-06-demoiselles-voronoi-redesign.md`.
+
+![Demoiselles Voronoi prototype in progress: digitized face contours and seed points overlaid on the painting](docs/screenshots/demoiselles_voronoi_progress.png)
+
 ## Progress
 
 - [x] Project scaffolding
 - [x] Data pipeline (`src/data.py`, tested against the real dataset)
 - [x] Mondrian chart (real-geometry redesign) — `charts.mondrian_treemap`, 22 tests passing
-- [ ] Demoiselles / Dance I redesign — planned, spec TBD
+- [ ] Demoiselles / Dance I redesign — in progress, prototyping face contours and seed points
 - [ ] Static site + GitHub Pages
 - [ ] Scheduled data refresh
 
