@@ -19,4 +19,12 @@ PALETTES = {
         "black": "#111111",
         "background": "#F2F0E6",
     },
+    "demoiselles": {
+        "mujer": "#C97B63",
+        "hombre": "#6E8CA0",
+        "transgenero": "#D4A24C",
+        "face": "#E8DCC8",
+        "background": "#F2EADD",
+        "black": "#111111",
+    },
 }
