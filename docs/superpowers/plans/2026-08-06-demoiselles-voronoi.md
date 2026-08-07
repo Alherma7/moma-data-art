@@ -1,5 +1,27 @@
 # Demoiselles Voronoi Implementation Plan
 
+## Amendment 2 (2026-08-07 session, later)
+
+The "Amendment (2026-08-07 session)" below (data-derived cell *count*,
+rank-ordered cell *size*, no weighted Voronoi) was implemented, rendered,
+and rejected by the user after seeing it — they want cell area genuinely
+proportional to artwork count, not just correctly ordered ("si hay una
+celda de 1 obra se debe de notar que es mucho más pequeña"). The
+mechanism changed to a **weighted Voronoi (power) diagram** with an
+iterative weight+position solver — full design rationale in
+`docs/superpowers/specs/2026-08-06-demoiselles-voronoi-redesign.md`'s
+"Amendment 2". This obsoletes Task 2's `bounded_voronoi_cells` (ordinary,
+unweighted Voronoi) and all of Task 3 (`_assign_labels_to_cells` rank-zip
+assignment) below — **that code was deleted from the notebook, not kept
+alongside the new mechanism**, per this project's established practice
+of physically removing superseded code rather than leaving both versions
+in place. Task 4's `demoiselles_voronoi` was rewritten to consume the new
+solver's per-category cells directly instead of zipping
+`cells_sorted`/`_assign_labels_to_cells`. `notebooks/04_demoiselles_prototyping.ipynb`
+is the authoritative source for the current implementation — the
+task-by-task steps below (Amendment 1 onward) describe the design that
+was superseded, kept for history, not as a script to re-run.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. This plan is notebook-first and interactive — do NOT use subagent-driven-development, since most tasks end with a handoff to the user running notebook cells and reporting back before the next task starts.
 
 **Goal:** Build the Demoiselles d'Avignon chart from a real Voronoi tessellation of the canvas, prototyped and validated interactively in a notebook, then graduated into `src/` once the user confirms each piece works.
@@ -8,10 +30,33 @@
 
 **Tech Stack:** Python, pandas, numpy, scipy (`scipy.spatial.Voronoi`), shapely, Plotly (`plotly.graph_objects`), pytest, Jupyter.
 
+## Amendment (2026-08-07 session)
+
+Task 1 (face contours + a fixed ~40-seed tessellation) was prototyped and
+found not to read well: most cells ended up unassigned/neutral because
+the fixed cell count rarely matched the real number of (decade, gender)
+categories. New rule: **the number of data-bearing cells equals the
+number of categories in the real data**, capped at `MAX_CELLS = 40` with
+the smallest pooled into "Other" beyond the cap. Cell size is still not
+an exact proportional/weighted-Voronoi encoding — an ordinary
+tessellation over `n_cells` seed points is generated, then the
+naturally-largest cells go to the highest-count categories by rank
+(same principle as before, just with cell *count* now data-derived).
+Practical effect: **category counts must be computed before seed points
+are generated**, since `n_cells` feeds `generate_seed_points(n, seed)`.
+This reorders the task sequence — gender classification and
+`person_gender_decade_counts` (originally Task 3, Steps 1-2) now run
+immediately after face contours (Task 1) and before the Voronoi
+tessellation (Task 2), rather than after it. Face contours themselves
+are unaffected — still fixed, hand-digitized, independent of data. The
+user has already approved the face-contour polygons produced in Task 1
+as good enough for this prototype stage; no further iteration on those
+coordinates is planned right now.
+
 ## Global Constraints
 
 - Coordinates are normalized to [0, 1] in **plot space**: `y=0` is the bottom of the image, `y=1` is the top (Plotly's native axis direction — not image top-left convention). Same convention as Mondrian.
-- Geometry (face contours, seed points, Voronoi cells, face-clipped cells) is fixed and does not depend on data — same "geometry stays fixed, assignment is rank-based" principle as Mondrian.
+- Face contours are fixed and independent of data. The *number* of Voronoi/data cells is data-derived (`n_cells = min(category_count, MAX_CELLS)`); their individual assignment is still rank-based, not an exact proportional encoding — same "assignment is rank-based" principle as Mondrian, just with cell count no longer fixed.
 - **Unlike Mondrian, color IS a data encoding here** — a cell's fill color is the gender bucket of its assigned (decade, gender) combination. There is no "painted color" to preserve, since Cubist faceting has no consistent flat-region palette to digitize.
 - Hover text is decade + count only (e.g. `"1960s<br>42 obras"`) — gender is never repeated in hover text, since it's already shown via cell color and the legend.
 - Fill-hover labels MUST use `text=` + `hoverinfo="text"` with `hoveron="fills"` — **never** `hovertemplate`, which plotly.js silently discards for `hoveron='fills'` hovers (forces `hovertemplate: false` internally and falls back to trace `text`/name instead). This bug was found and fixed for Mondrian in `src/charts.py::_rectangle_trace`; the same rule applies to every new trace-building helper written here.
@@ -191,8 +236,80 @@ Do not run the notebook. Tell the user it's ready, and wait for them to run thes
 - Modify: `notebooks/04_demoiselles_prototyping.ipynb`
 
 **Interfaces:**
-- Consumes: `SEED_POINTS`, `FACE_POLYGONS` (Task 1).
-- Produces (in-notebook): `bounded_voronoi_cells(seed_points, bounds) -> list[Polygon]`, `clip_faces(cells, face_polygons) -> list[Polygon | MultiPolygon]`. Consumed by Task 3 and Task 4, later graduated in Task 5.
+- Consumes: `FACE_POLYGONS` (Task 1); `data.load_raw_data`/`data.clean_artworks` (existing, produce `Decade_acquired`), the raw `Gender` column — moved up from what was originally Task 3, Steps 1-2, since seed count now depends on category count (see Amendment above).
+- Produces (in-notebook): `classify_gender(raw) -> str | None`, `person_gender_decade_counts(df) -> dict[tuple[str, str], int]`, `MAX_CELLS`, `n_cells`, a re-generated `SEED_POINTS` sized to `n_cells`, `bounded_voronoi_cells(seed_points, bounds) -> list[Polygon]`, `clip_faces(cells, face_polygons) -> list[Polygon | MultiPolygon]`. Consumed by Task 3 and Task 4, later graduated in Task 5.
+
+- [ ] **Step 0: Add gender classification, counts, and a data-sized `SEED_POINTS`**
+
+Markdown cell:
+```markdown
+## Category counts (drives cell count)
+
+The number of data-bearing Voronoi cells equals the number of (decade,
+gender) categories actually present in the cleaned data, capped at
+`MAX_CELLS` — categories beyond the cap are pooled into a single "Other"
+entry (the final pooling/rank-assignment happens in Task 3; here we only
+need the *count* to size the seed points). This must run before
+`generate_seed_points`, so `SEED_POINTS` from Task 1 is regenerated here
+with a data-derived `n` instead of its fixed default.
+```
+
+Code cell (gender classification, checked against the real distinct `Gender` values, same as before):
+```python
+def classify_gender(raw):
+    if not isinstance(raw, str):
+        return None
+    g = raw.strip().lower()
+    if "trans" in g:
+        return "Transgénero"
+    if g.startswith("female"):
+        return "Mujer"
+    if g.startswith("male"):
+        return "Hombre"
+    return None
+
+assert classify_gender("male") == "Hombre"
+assert classify_gender("female") == "Mujer"
+assert classify_gender("female (transwoman)") == "Transgénero"
+assert classify_gender("male (trans? ftm?)") == "Transgénero"
+assert classify_gender("transgender woman") == "Transgénero"
+assert classify_gender("") is None
+assert classify_gender("non-binary") is None
+assert classify_gender("gender non-conforming") is None
+print("all gender classification checks passed")
+```
+
+Code cell (person-level counts, same as before):
+```python
+def person_gender_decade_counts(df):
+    known = df[df["Decade_acquired"] != "unknown"]
+    counts = {}
+    for genders, decade in zip(known["Gender"], known["Decade_acquired"]):
+        if not isinstance(genders, list):
+            continue
+        for raw in genders:
+            bucket = classify_gender(raw)
+            if bucket is None:
+                continue
+            key = (decade, bucket)
+            counts[key] = counts.get(key, 0) + 1
+    return counts
+```
+
+Code cell (real-data counts, cap, and a data-sized `SEED_POINTS`):
+```python
+from src import data
+
+df = data.load_raw_data()
+cleaned = data.clean_artworks(df)
+counts = person_gender_decade_counts(cleaned)
+
+MAX_CELLS = 40
+n_cells = min(len(counts), MAX_CELLS)
+
+SEED_POINTS = generate_seed_points(n=n_cells)
+len(counts), n_cells, len(SEED_POINTS)
+```
 
 - [ ] **Step 1: Add the bounded-Voronoi cell**
 
@@ -314,86 +431,16 @@ Do not run the notebook. Tell the user it's ready, and wait for them to run thes
 
 ---
 
-### Task 3: Prototype gender classification and the generalized rank assignment
+### Task 3: Prototype the generalized rank assignment
 
 **Files:**
 - Modify: `notebooks/04_demoiselles_prototyping.ipynb`
 
 **Interfaces:**
-- Consumes: `data.load_raw_data`/`data.clean_artworks` (existing, produce `Decade_acquired`), the raw `Gender` column (list of strings per row).
-- Produces (in-notebook): `classify_gender(raw: str) -> str | None`, `person_gender_decade_counts(df) -> dict[tuple[str, str], int]`, `_assign_labels_to_cells(counts: dict, n_cells: int) -> list[tuple[Any, int] | None]`. Consumed by Task 4, later graduated in Task 5.
+- Consumes: `counts`, `n_cells` (Task 2, Step 0 — gender classification and person-level counting moved there since seed count depends on them).
+- Produces (in-notebook): `_assign_labels_to_cells(counts: dict, n_cells: int) -> list[tuple[Any, int] | None]`. Consumed by Task 4, later graduated in Task 5.
 
-- [ ] **Step 1: Add the gender-classification cell**
-
-Markdown cell:
-```markdown
-## Gender classification
-
-Checked against the real distinct `Gender` values in
-`data/raw/Artworks.json`: "contains trans" is checked before the
-prefix checks, so values like "female (transwoman)" and
-"male (trans? ftm?)" land in Transgénero instead of leaking into
-Mujer/Hombre by prefix match. Empty strings, "non-binary", and "gender
-non-conforming" are genuinely distinct from the three buckets and are
-discarded, not miscategorized.
-```
-
-Code cell:
-```python
-def classify_gender(raw):
-    if not isinstance(raw, str):
-        return None
-    g = raw.strip().lower()
-    if "trans" in g:
-        return "Transgénero"
-    if g.startswith("female"):
-        return "Mujer"
-    if g.startswith("male"):
-        return "Hombre"
-    return None
-
-# Checks against the real observed values
-assert classify_gender("male") == "Hombre"
-assert classify_gender("female") == "Mujer"
-assert classify_gender("female (transwoman)") == "Transgénero"
-assert classify_gender("male (trans? ftm?)") == "Transgénero"
-assert classify_gender("transgender woman") == "Transgénero"
-assert classify_gender("") is None
-assert classify_gender("non-binary") is None
-assert classify_gender("gender non-conforming") is None
-print("all gender classification checks passed")
-```
-
-- [ ] **Step 2: Add the person-level counting cell**
-
-Markdown cell:
-```markdown
-## Person-level (decade, gender) counts
-
-Each credited person on a known-decade artwork counts separately —
-`Gender` is a list per artwork (one entry per credited person), so a
-multi-person artwork contributes one count per person, not one per
-artwork.
-```
-
-Code cell:
-```python
-def person_gender_decade_counts(df):
-    known = df[df["Decade_acquired"] != "unknown"]
-    counts = {}
-    for genders, decade in zip(known["Gender"], known["Decade_acquired"]):
-        if not isinstance(genders, list):
-            continue
-        for raw in genders:
-            bucket = classify_gender(raw)
-            if bucket is None:
-                continue
-            key = (decade, bucket)
-            counts[key] = counts.get(key, 0) + 1
-    return counts
-```
-
-- [ ] **Step 3: Add the generalized rank-assignment cell**
+- [ ] **Step 1: Add the generalized rank-assignment cell**
 
 Markdown cell:
 ```markdown
@@ -421,7 +468,7 @@ def _assign_labels_to_cells(counts, n_cells):
     return assignments[:n_cells]
 ```
 
-- [ ] **Step 4: Add an inline-check cell**
+- [ ] **Step 2: Add an inline-check cell**
 
 ```python
 # Exact match: ranks straightforwardly by count, tuple labels preserved
@@ -449,20 +496,9 @@ assert result == [(("1960s", "Hombre"), 100), (("1970s", "Mujer"), 80), None, No
 print("all assignment checks passed")
 ```
 
-- [ ] **Step 5: Add a real-data inspection cell**
+- [ ] **Step 3: Hand off to the user**
 
-```python
-from src import data
-
-df = data.load_raw_data()
-cleaned = data.clean_artworks(df)
-counts = person_gender_decade_counts(cleaned)
-len(counts), sorted(counts.items(), key=lambda kv: kv[1], reverse=True)[:10]
-```
-
-- [ ] **Step 6: Hand off to the user**
-
-Do not run the notebook. Tell the user it's ready, and wait for them to run these cells, confirm the assertion checks pass, and sanity-check that the top (decade, gender) combinations printed in Step 5 look plausible before starting Task 4.
+Do not run the notebook. Tell the user it's ready, and wait for them to run these cells and confirm the assertion checks pass. `counts` was already inspected in Task 2, Step 0 (`len(counts)`, `n_cells`) — re-check those numbers still look plausible here since this cell relies on `n_cells` matching `len(counts)` up to the `MAX_CELLS` cap. Do not start Task 4 until they confirm.
 
 ---
 
@@ -472,7 +508,7 @@ Do not run the notebook. Tell the user it's ready, and wait for them to run thes
 - Modify: `notebooks/04_demoiselles_prototyping.ipynb`
 
 **Interfaces:**
-- Consumes: `FACE_POLYGONS` (Task 1), `DEMOISELLES_CELLS`, `polygon_to_traces` (Task 2), `person_gender_decade_counts`, `_assign_labels_to_cells` (Task 3), `data.load_raw_data`/`data.clean_artworks` (existing), `cleaned` (Task 3, Step 5).
+- Consumes: `FACE_POLYGONS` (Task 1), `DEMOISELLES_CELLS`, `polygon_to_traces` (Task 2), `person_gender_decade_counts` (Task 2, Step 0), `_assign_labels_to_cells` (Task 3), `cleaned` (Task 2, Step 0).
 - Produces (in-notebook): `demoiselles_voronoi(df) -> go.Figure` — the function graduated as-is in Task 5.
 
 - [ ] **Step 1: Add the legend-proxy cell**
@@ -551,6 +587,17 @@ Do not run the notebook. Tell the user it's ready, and wait for them to run thes
 ---
 
 ### Task 5: Graduate the validated code into `src/`
+
+**Note (2026-08-07 amendment):** the code blocks below still show
+`SEED_POINTS`/`DEMOISELLES_CELLS` as fixed module-level constants
+computed at import time — that assumption no longer holds now that seed
+count depends on `n_cells` (data-derived). By the time this task is
+actually reached, `demoiselles_geometry` needs a function (e.g.
+`build_cells(n_cells) -> list[Polygon]`) that `charts.demoiselles_voronoi(df)`
+calls after computing `counts`/`n_cells` from `df`, rather than importing
+pre-computed module-level cells. Revisit these code blocks against
+whatever the notebook actually looks like once Tasks 2-4 are
+re-validated under the new design — don't copy them verbatim.
 
 **Files:**
 - Create: `src/demoiselles_geometry.py`

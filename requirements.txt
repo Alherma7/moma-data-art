@@ -6,3 +6,5 @@ pyarrow
 pytest
 scipy
 shapely
+ipykernel
+nbformat

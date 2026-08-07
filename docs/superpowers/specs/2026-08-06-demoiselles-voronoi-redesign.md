@@ -1,5 +1,107 @@
 # Demoiselles d'Avignon Voronoi redesign
 
+## Amendment 2 (2026-08-07 session, later)
+
+Amendment 1 below (cell *count* data-derived, cell *size* only
+rank-ordered, no proportionality) was implemented and rendered, and the
+user rejected it after seeing it: "si hay una celda de 1 obra se debe de
+notar que es mucho más pequeña" — they want genuine proportional area,
+not just correct ordering. This supersedes Amendment 1's "aproximado por
+rango" stance entirely.
+
+**New mechanism: a real weighted Voronoi diagram (power/Laguerre
+diagram), not an ordinary Voronoi diagram.** Implemented and validated
+numerically (mean absolute area error ~0.005 of canvas area across the
+24 real categories, zero cell overlaps) before being wired into the
+notebook — see `notebooks/04_demoiselles_prototyping.ipynb` for the
+authoritative, current code; this doc records the *design*, not a
+step-by-step build script (the notebook changed too fast across several
+live iterations this session for the plan doc to stay a literal script).
+
+- **Power diagram, not ordinary Voronoi.** Each site `i` gets a weight
+  `w_i`; a point `x` belongs to site `i`'s cell iff
+  `|x - p_i|² - w_i` is smaller than for every other site (power
+  distance, not Euclidean distance). Computed via the standard
+  lift-to-paraboloid trick: lift `(x_i, y_i)` to
+  `(x_i, y_i, x_i² + y_i² - w_i)`, take `scipy.spatial.ConvexHull` of
+  the lifted points, keep the **lower** hull facets
+  (`hull.equations[:, 2] < 0`), and for each lower-hull triangle solve
+  for its "power center" (the 2D point equidistant in power-distance
+  from the triangle's 3 sites — a 2×2 linear system, the power-diagram
+  analogue of a circumcenter). A site's cell is the convex hull of all
+  power-centers of triangles containing it (power cells are always
+  convex, so no angular sorting is needed — `shapely`'s `MultiPoint(...).convex_hull`
+  does it directly). Sites are mirrored across all four canvas edges
+  first (same trick as the old unweighted `bounded_voronoi_cells`) so
+  every real site's cell closes inside the canvas.
+- **Iterative solver, two knobs adjusted together per iteration:**
+  1. *Weight update*: `w_i += lr * (target_frac_i - actual_frac_i)`,
+     then re-center weights (`w -= w.mean()`) since power diagrams are
+     invariant to a global additive shift in all weights.
+  2. *Position update (partial Lloyd relaxation)*: nudge each site
+     toward its own cell's centroid, `p_i += move_lr * (centroid_i - p_i)`,
+     skipping the move if the centroid falls inside a face contour.
+     Weight adjustment alone left 2-3 categories stuck far from target
+     (their fixed anchor position was geometrically boxed in by
+     neighbors); adding position relaxation alongside weight adjustment
+     dropped mean absolute error from ~0.005 to ~0.00003 (pre-face-clip).
+     ~250 iterations, `lr≈0.4`, `move_lr≈0.15` converges cleanly for 24
+     sites on this canvas.
+  3. Face clipping (`clip_faces`, unchanged from Amendment 1) is applied
+     **after** convergence, not during — the solver converges on the
+     full unit square, and whatever area a face steals from an
+     adjacent cell afterward is accepted as a known, modest distortion
+     (same trade-off already accepted for face-adjacent cells in the
+     unweighted version).
+- **Minimum-area floor, chosen explicitly over literal proportionality.**
+  With real data this skewed (1 to 44,170 works — a ~44,000× range),
+  literal proportional area makes the tiniest categories mathematically
+  vanish (zero-area / absent from the diagram entirely). Asked directly,
+  the user chose a visible floor over disappearance: `target_frac_i =
+  max(raw_frac_i, MIN_FRAC)` (`MIN_FRAC = 0.01`, i.e. every category
+  gets at least 1% of canvas area), renormalized to sum to 1 afterward.
+  This means the smallest categories are **not** literally
+  proportional — their area is a floor, not a measurement — which is a
+  deliberate, known departure from "genuinely proportional" for the
+  sake of every category staying visible and hoverable, matching the
+  user's reference screenshot where even the smallest labeled regions
+  remain visible slivers, not points.
+- **Anchors, not a flat point cloud.** One site per category (24, ranked
+  by count like before), placed via the same face-avoiding jittered-grid
+  `generate_seed_points` already built in Task 1 — positions then move
+  during Lloyd relaxation, so the initial placement only needs to be
+  reasonably well-spread, not final.
+- **Practical effect on the pipeline shape:** cell generation and
+  category assignment are no longer separate steps (generate geometry,
+  then separately rank-zip categories to cells). A weighted-diagram
+  *site* **is** a category from the moment it's created — there is no
+  post-hoc `_assign_labels_to_cells`-style rank matching anymore; that
+  entire mechanism (introduced in Amendment 1) is deleted, not kept
+  alongside the new one.
+
+## Amendment 1 (2026-08-07 session, earlier — partially superseded above)
+
+The first prototype (fixed ~40 seed points, independent of the data,
+zipped by rank to whatever (decade, gender) combinations existed) didn't
+read well once rendered: most cells ended up unassigned/neutral because
+the fixed cell count rarely matched the real number of categories. The
+design changes to: **the number of data-bearing Voronoi cells equals the
+number of (decade, gender) categories actually present in the cleaned
+data**, capped at `MAX_CELLS` (40, matching the old fixed density) —
+categories beyond the cap are pooled into a single "Other" entry, same
+pooling rule as before. Cell *size* is still not an exact proportional
+encoding (no weighted/power Voronoi, no iterative area-fitting
+algorithm): cells are generated by an ordinary unweighted Voronoi
+tessellation over `n_cells` seed points, then the naturally-largest
+cells are handed to the highest-count categories by rank — the same
+zip-by-rank principle as Mondrian and as the original prototype, just
+with the cell *count* now matched to the category count instead of
+fixed. This means seed-point generation (and therefore the Voronoi
+tessellation) can only happen **after** the (decade, gender) counts are
+computed from the real data — the "Data mapping" step now runs before
+the "Geometry" step, reversing the original build order. Face contours
+are unaffected — still fixed, hand-digitized, independent of data.
+
 ## Concept
 
 Same principle as the Mondrian chart: the painting's own real geometry is
@@ -43,17 +145,24 @@ primary-color blocks do.
 
 - **Decade**: `Decade_acquired`, same field and logic as Mondrian.
 
-- **Cell assignment**: count (decade, gender) combinations, e.g.
-  `("1960s", "Mujer")`, and rank them by count descending. Voronoi cells
-  are ranked by area descending. Combinations are zipped to cells by
-  rank, generalizing Mondrian's `_assign_decades_to_rectangles` so the
-  "label" is a `(decade, gender)` tuple instead of a bare decade. If
-  there are more combinations than cells, the smallest are pooled into an
-  "Other" entry and re-sorted (identical logic to Mondrian). If there are
-  more cells than combinations — expected here, since (decade × gender)
-  is a much finer split than decade alone — the excess cells are left
-  unassigned, rendered with no hover and no data color (same neutral
-  treatment as Mondrian's unassigned rectangles).
+- **Cell count**: count (decade, gender) combinations, e.g.
+  `("1960s", "Mujer")`. `n_cells = min(len(counts), MAX_CELLS)` with
+  `MAX_CELLS = 40`. If there are more combinations than `MAX_CELLS`, the
+  smallest are pooled into a single "Other" entry so the category count
+  itself is capped at `MAX_CELLS` (same pooling rule as before, just
+  applied before seed generation instead of after). `n_cells` seed points
+  are then generated (see Geometry) and tessellated, so **every cell
+  ends up assigned to a category** — there are no leftover
+  neutral/unassigned cells in the normal case.
+- **Cell assignment**: categories are ranked by count descending; Voronoi
+  cells are ranked by their naturally-occurring area descending (no
+  weighted/power Voronoi — an ordinary tessellation over `n_cells` seed
+  points already produces cells of varying size just from the spatial
+  layout, and this is treated as good enough for rank purposes rather
+  than exact proportionality). Categories are zipped to cells by rank,
+  generalizing Mondrian's `_assign_decades_to_rectangles` so the "label"
+  is a `(decade, gender)` tuple instead of a bare decade — the largest
+  cell gets the highest-count category, and so on down.
 
 - **Color** = gender of the combination assigned to that cell. Unassigned
   cells get a neutral, undifferentiated fill.
@@ -79,8 +188,10 @@ primary-color blocks do.
   covering the *entire* canvas — figures and background alike, per the
   user's direction that data isn't restricted to the background. Points
   falling inside a face contour are discarded before tessellation, so
-  faces are never subdivided by seed density. ~40 points as a starting
-  density, tunable in the notebook once the first render is visible.
+  faces are never subdivided by seed density. Point count is `n_cells`
+  (see Data mapping's "Cell count"), not a fixed density — the same
+  `generate_seed_points(n, seed)` function, just called with a
+  data-derived `n` instead of a constant default.
 - **Voronoi diagram**: `scipy.spatial.Voronoi` over the surviving seed
   points. Infinite regions are bounded to the canvas rectangle (standard
   bounded-Voronoi clipping).
