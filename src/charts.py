@@ -1,3 +1,6 @@
+import base64
+from io import BytesIO
+
 import plotly.graph_objects as go
 
 from . import config, demoiselles_geometry, mondrian_geometry
@@ -166,26 +169,40 @@ def _legend_proxy_traces(palette):
     ]
 
 
+def _face_image_overlay(bbox, image):
+    """Plotly layout_image dict placing an already-polygon-masked RGBA
+    crop (demoiselles_geometry.face_image_crop) at its bounding box in
+    plot coordinates."""
+    x0, y0, x1, y1 = bbox
+    buf = BytesIO()
+    image.save(buf, format="PNG")
+    encoded = base64.b64encode(buf.getvalue()).decode()
+    return dict(
+        source=f"data:image/png;base64,{encoded}",
+        xref="x", yref="y",
+        x=x0, y=y1, sizex=x1 - x0, sizey=y1 - y0,
+        xanchor="left", yanchor="top", sizing="stretch", layer="above",
+    )
+
+
 def demoiselles_voronoi(df):
     """Voronoi cells tessellated over images/les_demoiselles_davignon.png
     (src/demoiselles_geometry.py): a weighted (power) Voronoi diagram
-    whose cell area is fit to each (decade, gender) category's artwork
-    count, then clipped against the 5 fixed face contours so faces stay
-    undivided decoration. Unlike mondrian_treemap, color IS a data
-    encoding here -- a cell's fill color is the gender of its assigned
-    category. Cell geometry is fixed at import time
-    (demoiselles_geometry.DEMOISELLES_CELLS, solved against the full
-    cleaned dataset); df only re-ranks categories for the assignment and
-    hover text, so it should normally be the same dataset the geometry
-    was built from. Hover shows decade + count only -- gender is already
-    shown via color and the legend."""
+    whose cell area is fit to sqrt(each (decade, gender) category's
+    artwork count), anchored at hand-placed positions, then clipped
+    against the 5 fixed face contours. Unlike mondrian_treemap, color IS
+    a data encoding here -- a cell's fill color is the gender of its
+    assigned category. The 5 faces show the real painting pixels for that
+    region (masked to the polygon shape) instead of a flat fill. Cell
+    geometry is fixed at import time (demoiselles_geometry.DEMOISELLES_CELLS,
+    solved against the full cleaned dataset); df only re-ranks categories
+    for the assignment and hover text, so it should normally be the same
+    dataset the geometry was built from. Hover shows decade + count only
+    -- gender is already shown via color and the legend."""
     palette = config.PALETTES["demoiselles"]
     df_items = demoiselles_geometry.category_items(df)
 
     fig = go.Figure()
-    for face in demoiselles_geometry.FACE_POLYGONS:
-        for trace in _polygon_traces(face, palette["face"], palette):
-            fig.add_trace(trace)
 
     for i, cell in demoiselles_geometry.DEMOISELLES_CELLS.items():
         if i >= len(df_items):
@@ -198,6 +215,9 @@ def demoiselles_voronoi(df):
 
     for trace in _legend_proxy_traces(palette):
         fig.add_trace(trace)
+
+    for bbox, image in demoiselles_geometry.FACE_IMAGE_CROPS:
+        fig.add_layout_image(_face_image_overlay(bbox, image))
 
     fig.update_layout(
         plot_bgcolor=palette["background"],

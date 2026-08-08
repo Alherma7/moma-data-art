@@ -20,9 +20,14 @@ PALETTES = {
         "background": "#F2F0E6",
     },
     "demoiselles": {
-        "mujer": "#C97B63",
-        "hombre": "#6E8CA0",
-        "transgenero": "#D4A24C",
+        # Sampled directly from images/les_demoiselles_davignon.png (rose
+        # flesh/dress, blue-grey drapery, olive-green mask stripes). Fails
+        # the dataviz skill's categorical accessibility validator (chroma
+        # floor, CVD separation) -- kept anyway, by explicit user request,
+        # for fidelity to the source painting over accessibility.
+        "mujer": "#A97878",
+        "hombre": "#71969F",
+        "transgenero": "#566454",
         "face": "#E8DCC8",
         "background": "#F2EADD",
         "black": "#111111",

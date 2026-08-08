@@ -118,13 +118,34 @@ def test_demoiselles_voronoi_labels_fill_hover_via_text_not_hovertemplate():
 
 def test_demoiselles_voronoi_top_ranked_cell_carries_the_top_ranked_category():
     """Cell index 0 in demoiselles_geometry.DEMOISELLES_CELLS is the
-    category with the highest artwork count, by construction of
-    build_cells (anchors/target areas are generated in rank order). When
-    df is the same dataset the geometry was built from, index 0's hover
-    text must match the top-ranked (decade, gender) pair."""
+    category with the highest artwork count, by construction of ANCHORS
+    (placed in CATEGORY_ITEMS rank order). When df is the same dataset
+    the geometry was built from, index 0's hover text must match the
+    top-ranked (decade, gender) pair."""
     fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
     top_decade, top_gender = demoiselles_geometry.CATEGORY_ITEMS[0][0]
-    n_faces = len(demoiselles_geometry.FACE_POLYGONS)
-    first_cell_trace = fig.data[n_faces]
+    first_cell_trace = fig.data[0]
     assert top_decade in first_cell_trace.text
     assert first_cell_trace.fillcolor == config.PALETTES["demoiselles"][charts._GENDER_PALETTE_KEYS[top_gender]]
+
+
+def test_demoiselles_voronoi_has_no_flat_face_traces():
+    """Faces are real image crops (fig.layout.images), not fill='toself'
+    traces -- unlike the data cells, fig.data should contain nothing for
+    the 5 faces."""
+    fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
+    n_cells = len(demoiselles_geometry.DEMOISELLES_CELLS)
+    n_legend = len(charts._GENDER_PALETTE_KEYS)
+    trace_cell_counts = sum(
+        len(cell.geoms) if cell.geom_type == "MultiPolygon" else 1
+        for cell in demoiselles_geometry.DEMOISELLES_CELLS.values()
+    )
+    assert len(fig.data) == trace_cell_counts + n_legend
+    assert n_cells > 0
+
+
+def test_demoiselles_voronoi_overlays_one_image_per_face():
+    fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
+    assert len(fig.layout.images) == len(demoiselles_geometry.FACE_CONTOURS)
+    for image in fig.layout.images:
+        assert image.source.startswith("data:image/png;base64,")

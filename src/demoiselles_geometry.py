@@ -1,8 +1,10 @@
 from collections import defaultdict
+from io import BytesIO
 
 import numpy as np
+from PIL import Image, ImageDraw
 from scipy.spatial import ConvexHull
-from shapely.geometry import MultiPoint, Point, Polygon, box
+from shapely.geometry import MultiPoint, Polygon, box
 
 from . import config, data
 
@@ -19,33 +21,37 @@ FACE_CONTOURS = [
 
 FACE_POLYGONS = [Polygon(points) for points in FACE_CONTOURS]
 
-MAX_CELLS = 40
-MIN_FRAC = 0.01  # floors each category's target area share so the smallest
-# categories don't vanish under real data's ~44,000x count range
-
-
-def generate_seed_points(n=40, seed=config.RANDOM_STATE):
-    """Jittered grid over the whole canvas, with points inside any face
-    contour discarded before tessellation. These are only a well-spread
-    initial layout for the weighted-Voronoi solver's anchors -- it moves
-    them during its position-relaxation step, so they don't need to be
-    final."""
-    rng = np.random.default_rng(seed)
-    grid_size = int(np.ceil(np.sqrt(n * 1.5)))
-    xs = np.linspace(0.03, 0.97, grid_size)
-    ys = np.linspace(0.03, 0.97, grid_size)
-    candidates = [(x, y) for x in xs for y in ys]
-    jitter = rng.uniform(-0.03, 0.03, size=(len(candidates), 2))
-    jittered = [(x + jx, y + jy) for (x, y), (jx, jy) in zip(candidates, jitter)]
-    points = [
-        (x, y) for x, y in jittered
-        if not any(polygon.contains(Point(x, y)) for polygon in FACE_POLYGONS)
-    ]
-    # candidates are built in x-major grid order, so truncating to n without
-    # shuffling first would systematically drop whichever columns come last
-    # (e.g. the whole right edge of the canvas) instead of sampling evenly
-    rng.shuffle(points)
-    return points[:n]
+# Placed by hand (like FACE_CONTOURS), ordered to line up positionally with
+# CATEGORY_ITEMS below (index 0 = highest-count category). Unlike the
+# earlier jittered-grid version, the solver never moves these -- position is
+# fixed once placed, only each cell's weight is adjusted to hit its target
+# area. Approved as-is by the user without further hand-tuning.
+ANCHORS = [
+    (0.42, 0.01),  # 0: ('1960s', 'Hombre') (44170)
+    (0.42, 0.62),  # 1: ('2010s', 'Hombre') (20360)
+    (0.79, 0.01),  # 2: ('2000s', 'Hombre') (20334)
+    (0.76, 0.19),  # 3: ('1970s', 'Hombre') (11697)
+    (0.40, 0.95),  # 4: ('1980s', 'Hombre') (9452)
+    (0.94, 0.78),  # 5: ('1990s', 'Hombre') (9164)
+    (0.01, 0.78),  # 6: ('2010s', 'Mujer') (6911)
+    (0.01, 0.43),  # 7: ('1940s', 'Hombre') (6733)
+    (0.23, 0.05),  # 8: ('1950s', 'Hombre') (6023)
+    (0.61, 0.80),  # 9: ('2000s', 'Mujer') (5752)
+    (0.76, 0.95),  # 10: ('2020s', 'Hombre') (5710)
+    (0.22, 0.38),  # 11: ('1990s', 'Mujer') (2935)
+    (0.80, 0.42),  # 12: ('2020s', 'Mujer') (2040)
+    (0.97, 0.23),  # 13: ('1970s', 'Mujer') (1664)
+    (0.05, 0.03),  # 14: ('1930s', 'Hombre') (1655)
+    (0.98, 0.41),  # 15: ('1980s', 'Mujer') (1190)
+    (0.25, 0.99),  # 16: ('1960s', 'Mujer') (1156)
+    (0.59, 0.43),  # 17: ('1940s', 'Mujer') (657)
+    (0.21, 0.20),  # 18: ('1950s', 'Mujer') (390)
+    (0.95, 0.96),  # 19: ('2020s', 'Transgénero') (63)
+    (0.61, 0.58),  # 20: ('1930s', 'Mujer') (50)
+    (0.39, 0.42),  # 21: ('1940s', 'Transgénero') (10)
+    (0.40, 0.19),  # 22: ('1920s', 'Hombre') (9)
+    (0.05, 0.61),  # 23: ('1950s', 'Transgénero') (1)
+]
 
 
 def classify_gender(raw):
@@ -87,21 +93,21 @@ def person_gender_decade_counts(df):
 def category_items(df):
     """(decade, gender) categories present in df, ranked by count
     descending -- fixes the index <-> category mapping used to size and
-    label every cell (anchors, target areas, and the final render are
+    label every cell (ANCHORS, target areas, and the final render are
     all indexed the same way)."""
     counts = person_gender_decade_counts(df)
     return sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
 
 
-def target_fracs(items, min_frac=MIN_FRAC):
-    """Each category's target cell-area share, floored at min_frac -- a
-    deliberate, known departure from exact proportionality for the
-    smallest categories, matching the reference layout where even the
-    smallest labeled regions stay visible slivers."""
-    total = sum(count for _, count in items)
-    raw = np.array([count / total for _, count in items])
-    floored = np.maximum(raw, min_frac)
-    return floored / floored.sum()
+def target_fracs(items):
+    """Each category's target cell-area share, scaled by sqrt(count)
+    rather than linear count: real data spans a ~44,000x count range (1
+    to 44,170), and a linear-area/floor scheme collapsed most of the tail
+    into identically-sized cells once floored. sqrt keeps every
+    category's area strictly ordered and visibly distinct without an
+    artificial floor."""
+    weights = np.array([count ** 0.5 for _, count in items])
+    return weights / weights.sum()
 
 
 def _power_center(p1, w1, p2, w2, p3, w3):
@@ -175,46 +181,23 @@ def power_diagram(points, weights, bounds=(0.0, 0.0, 1.0, 1.0)):
     return cells
 
 
-def solve_weighted_voronoi(
-    anchors, target_fracs, face_polygons, bounds=(0.0, 0.0, 1.0, 1.0),
-    iterations=250, weight_lr=0.4, move_lr=0.15,
-):
-    """Iteratively adjusts each site's weight (to push its cell area
-    toward target_fracs) and position (partial Lloyd relaxation toward
-    its own cell centroid, skipped if that centroid falls inside a face
-    contour). Weight adjustment alone leaves some cells stuck far from
-    target when their fixed position is geometrically boxed in by
-    neighbors; moving positions alongside weights fixes that. Returns
-    (cells, weights, positions)."""
+def solve_cell_weights(anchors, target_fracs, bounds=(0.0, 0.0, 1.0, 1.0), iterations=250, weight_lr=0.4):
+    """Iteratively adjusts each site's weight to push its cell area
+    toward target_fracs. Positions are never touched -- anchors are
+    placed by hand (see ANCHORS above), so the solver's only job is
+    sizing. Returns (cells, weights)."""
     n = len(anchors)
-    positions = [tuple(p) for p in anchors]
     weights = np.zeros(n)
     total_area = (bounds[2] - bounds[0]) * (bounds[3] - bounds[1])
 
     for _ in range(iterations):
-        cells = power_diagram(positions, weights, bounds)
+        cells = power_diagram(anchors, weights, bounds)
         areas = np.array([cells[i].area if i in cells else 0.0 for i in range(n)])
         error = target_fracs - areas / total_area
         weights = weights + weight_lr * error
         weights -= weights.mean()  # power diagrams are invariant to a global weight shift
 
-        new_positions = []
-        for i in range(n):
-            cell = cells.get(i)
-            if cell is None or cell.is_empty:
-                new_positions.append(positions[i])
-                continue
-            cx, cy = cell.centroid.x, cell.centroid.y
-            if any(face.contains(Point(cx, cy)) for face in face_polygons):
-                new_positions.append(positions[i])
-                continue
-            ox, oy = positions[i]
-            nx = min(max(ox + move_lr * (cx - ox), 0.01), 0.99)
-            ny = min(max(oy + move_lr * (cy - oy), 0.01), 0.99)
-            new_positions.append((nx, ny))
-        positions = new_positions
-
-    return power_diagram(positions, weights, bounds), weights, positions
+    return power_diagram(anchors, weights, bounds), weights
 
 
 def clip_faces(cells, face_polygons):
@@ -236,20 +219,36 @@ def clip_faces(cells, face_polygons):
     return clipped
 
 
-def build_cells(df):
-    """Run the full pipeline -- category ranking, target areas, the
-    weighted-Voronoi solve, and face clipping -- once for df. Returns
-    (items, cells): items is category_items(df) truncated to MAX_CELLS
-    (categories beyond the cap are silently dropped, not pooled -- real
-    data has 24 categories, well under the cap, so pooling was never
-    needed); cells is {index: Polygon | MultiPolygon} keyed into items by
-    position."""
-    items = category_items(df)[:MAX_CELLS]
-    anchors = generate_seed_points(n=len(items))
-    fracs = target_fracs(items)
-    weighted_cells, _weights, _positions = solve_weighted_voronoi(anchors, fracs, FACE_POLYGONS)
-    cells = clip_faces(weighted_cells, FACE_POLYGONS)
-    return items, cells
+def face_image_crop(contour, painting):
+    """Masks painting to contour's shape (plot-space, y=0 at bottom) and
+    returns (bbox, rgba_crop): bbox is the polygon's bounding box in
+    normalized plot coordinates (x0, y0, x1, y1), rgba_crop is the
+    painting cropped to that box with everything outside the polygon
+    made transparent. Plotly can't clip an image to an arbitrary polygon
+    natively, so the clipping happens here in PIL; the caller only needs
+    to place a rectangle."""
+    w, h = painting.size
+    px_points = [(x * w, (1 - y) * h) for x, y in contour]
+    xs = [p[0] for p in px_points]
+    ys = [p[1] for p in px_points]
+    x0_px, x1_px = min(xs), max(xs)
+    y0_px, y1_px = min(ys), max(ys)
+
+    mask = Image.new("L", (w, h), 0)
+    ImageDraw.Draw(mask).polygon(px_points, fill=255)
+    rgba = painting.convert("RGBA")
+    rgba.putalpha(mask)
+    crop = rgba.crop((int(x0_px), int(y0_px), int(x1_px) + 1, int(y1_px) + 1))
+
+    bbox = (x0_px / w, 1 - y1_px / h, x1_px / w, 1 - y0_px / h)
+    return bbox, crop
 
 
-CATEGORY_ITEMS, DEMOISELLES_CELLS = build_cells(data.clean_artworks(data.load_raw_data()))
+CATEGORY_ITEMS = category_items(data.clean_artworks(data.load_raw_data()))
+assert len(ANCHORS) == len(CATEGORY_ITEMS)
+TARGET_FRACS = target_fracs(CATEGORY_ITEMS)
+_WEIGHTED_CELLS, _WEIGHTS = solve_cell_weights(ANCHORS, TARGET_FRACS)
+DEMOISELLES_CELLS = clip_faces(_WEIGHTED_CELLS, FACE_POLYGONS)
+
+PAINTING = Image.open(config.IMAGES_DIR / "les_demoiselles_davignon.png").convert("RGB")
+FACE_IMAGE_CROPS = [face_image_crop(contour, PAINTING) for contour in FACE_CONTOURS]
