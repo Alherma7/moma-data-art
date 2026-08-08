@@ -25,9 +25,9 @@ PALETTES = {
         # the dataviz skill's categorical accessibility validator (chroma
         # floor, CVD separation) -- kept anyway, by explicit user request,
         # for fidelity to the source painting over accessibility.
-        "mujer": "#A97878",
-        "hombre": "#71969F",
-        "transgenero": "#566454",
+        "woman": "#A97878",
+        "man": "#71969F",
+        "transgender": "#566454",
         "face": "#E8DCC8",
         "background": "#F2EADD",
         "black": "#111111",

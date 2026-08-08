@@ -153,7 +153,7 @@ def _polygon_traces(polygon, fillcolor, palette, hovertext=None):
     return traces
 
 
-_GENDER_PALETTE_KEYS = {"Mujer": "mujer", "Hombre": "hombre", "Transgénero": "transgenero"}
+_GENDER_PALETTE_KEYS = {"Woman": "woman", "Man": "man", "Transgender": "transgender"}
 
 
 def _legend_proxy_traces(palette):
@@ -209,7 +209,7 @@ def demoiselles_voronoi(df):
             continue
         (decade, gender), count = df_items[i]
         fillcolor = palette[_GENDER_PALETTE_KEYS[gender]]
-        hovertext = f"{decade}<br>{count} obras"
+        hovertext = f"{decade}<br>{count} artworks"
         for trace in _polygon_traces(cell, fillcolor, palette, hovertext=hovertext):
             fig.add_trace(trace)
 

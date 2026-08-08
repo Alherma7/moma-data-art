@@ -19,11 +19,11 @@ def test_anchors_align_one_to_one_with_real_categories():
 
 
 def test_classify_gender_buckets_real_observed_values():
-    assert geo.classify_gender("male") == "Hombre"
-    assert geo.classify_gender("female") == "Mujer"
-    assert geo.classify_gender("female (transwoman)") == "Transgénero"
-    assert geo.classify_gender("male (trans? ftm?)") == "Transgénero"
-    assert geo.classify_gender("transgender woman") == "Transgénero"
+    assert geo.classify_gender("male") == "Man"
+    assert geo.classify_gender("female") == "Woman"
+    assert geo.classify_gender("female (transwoman)") == "Transgender"
+    assert geo.classify_gender("male (trans? ftm?)") == "Transgender"
+    assert geo.classify_gender("transgender woman") == "Transgender"
 
 
 def test_classify_gender_discards_non_bucket_values():
@@ -39,7 +39,7 @@ def test_person_gender_decade_counts_counts_per_person():
         "Decade_acquired": ["1960s", "1960s", "1970s"],
     })
     counts = geo.person_gender_decade_counts(df)
-    assert counts == {("1960s", "Hombre"): 2, ("1960s", "Mujer"): 1}
+    assert counts == {("1960s", "Man"): 2, ("1960s", "Woman"): 1}
 
 
 def test_category_items_ranks_by_count_descending():
@@ -48,7 +48,7 @@ def test_category_items_ranks_by_count_descending():
         "Decade_acquired": ["1960s"] * 3 + ["1970s"] * 10,
     })
     items = geo.category_items(df)
-    assert items == [(("1970s", "Mujer"), 10), (("1960s", "Hombre"), 3)]
+    assert items == [(("1970s", "Woman"), 10), (("1960s", "Man"), 3)]
 
 
 def test_target_fracs_sums_to_one_and_strictly_orders_the_tail():

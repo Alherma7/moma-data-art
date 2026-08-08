@@ -92,16 +92,16 @@ def test_demoiselles_voronoi_hover_never_contains_a_gender_word():
     fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
     for trace in fig.data:
         if trace.hoverinfo == "text" and trace.text:
-            assert "Mujer" not in trace.text
-            assert "Hombre" not in trace.text
-            assert "Transgénero" not in trace.text
+            assert "Woman" not in trace.text
+            assert "Man" not in trace.text
+            assert "Transgender" not in trace.text
 
 
 def test_demoiselles_voronoi_legend_has_three_gender_entries_with_correct_colors():
     fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
     legend_traces = [t for t in fig.data if t.showlegend]
     legend_names = {t.name for t in legend_traces}
-    assert legend_names == {"Mujer", "Hombre", "Transgénero"}
+    assert legend_names == {"Woman", "Man", "Transgender"}
     for trace in legend_traces:
         expected_color = config.PALETTES["demoiselles"][charts._GENDER_PALETTE_KEYS[trace.name]]
         assert trace.marker.color == expected_color

@@ -27,48 +27,48 @@ FACE_POLYGONS = [Polygon(points) for points in FACE_CONTOURS]
 # fixed once placed, only each cell's weight is adjusted to hit its target
 # area. Approved as-is by the user without further hand-tuning.
 ANCHORS = [
-    (0.42, 0.01),  # 0: ('1960s', 'Hombre') (44170)
-    (0.42, 0.62),  # 1: ('2010s', 'Hombre') (20360)
-    (0.79, 0.01),  # 2: ('2000s', 'Hombre') (20334)
-    (0.76, 0.19),  # 3: ('1970s', 'Hombre') (11697)
-    (0.40, 0.95),  # 4: ('1980s', 'Hombre') (9452)
-    (0.94, 0.78),  # 5: ('1990s', 'Hombre') (9164)
-    (0.01, 0.78),  # 6: ('2010s', 'Mujer') (6911)
-    (0.01, 0.43),  # 7: ('1940s', 'Hombre') (6733)
-    (0.23, 0.05),  # 8: ('1950s', 'Hombre') (6023)
-    (0.61, 0.80),  # 9: ('2000s', 'Mujer') (5752)
-    (0.76, 0.95),  # 10: ('2020s', 'Hombre') (5710)
-    (0.22, 0.38),  # 11: ('1990s', 'Mujer') (2935)
-    (0.80, 0.42),  # 12: ('2020s', 'Mujer') (2040)
-    (0.97, 0.23),  # 13: ('1970s', 'Mujer') (1664)
-    (0.05, 0.03),  # 14: ('1930s', 'Hombre') (1655)
-    (0.98, 0.41),  # 15: ('1980s', 'Mujer') (1190)
-    (0.25, 0.99),  # 16: ('1960s', 'Mujer') (1156)
-    (0.59, 0.43),  # 17: ('1940s', 'Mujer') (657)
-    (0.21, 0.20),  # 18: ('1950s', 'Mujer') (390)
-    (0.95, 0.96),  # 19: ('2020s', 'Transgénero') (63)
-    (0.61, 0.58),  # 20: ('1930s', 'Mujer') (50)
-    (0.39, 0.42),  # 21: ('1940s', 'Transgénero') (10)
-    (0.40, 0.19),  # 22: ('1920s', 'Hombre') (9)
-    (0.05, 0.61),  # 23: ('1950s', 'Transgénero') (1)
+    (0.42, 0.01),  # 0: ('1960s', 'Man') (44170)
+    (0.42, 0.62),  # 1: ('2010s', 'Man') (20360)
+    (0.79, 0.01),  # 2: ('2000s', 'Man') (20334)
+    (0.76, 0.19),  # 3: ('1970s', 'Man') (11697)
+    (0.40, 0.95),  # 4: ('1980s', 'Man') (9452)
+    (0.94, 0.78),  # 5: ('1990s', 'Man') (9164)
+    (0.01, 0.78),  # 6: ('2010s', 'Woman') (6911)
+    (0.01, 0.43),  # 7: ('1940s', 'Man') (6733)
+    (0.23, 0.05),  # 8: ('1950s', 'Man') (6023)
+    (0.61, 0.80),  # 9: ('2000s', 'Woman') (5752)
+    (0.76, 0.95),  # 10: ('2020s', 'Man') (5710)
+    (0.22, 0.38),  # 11: ('1990s', 'Woman') (2935)
+    (0.80, 0.42),  # 12: ('2020s', 'Woman') (2040)
+    (0.97, 0.23),  # 13: ('1970s', 'Woman') (1664)
+    (0.05, 0.03),  # 14: ('1930s', 'Man') (1655)
+    (0.98, 0.41),  # 15: ('1980s', 'Woman') (1190)
+    (0.25, 0.99),  # 16: ('1960s', 'Woman') (1156)
+    (0.59, 0.43),  # 17: ('1940s', 'Woman') (657)
+    (0.21, 0.20),  # 18: ('1950s', 'Woman') (390)
+    (0.95, 0.96),  # 19: ('2020s', 'Transgender') (63)
+    (0.61, 0.58),  # 20: ('1930s', 'Woman') (50)
+    (0.39, 0.42),  # 21: ('1940s', 'Transgender') (10)
+    (0.40, 0.19),  # 22: ('1920s', 'Man') (9)
+    (0.05, 0.61),  # 23: ('1950s', 'Transgender') (1)
 ]
 
 
 def classify_gender(raw):
-    """Bucket a raw MoMA Gender string into Mujer/Hombre/Transgenero, or
+    """Bucket a raw MoMA Gender string into Woman/Man/Transgender, or
     None if it doesn't fit any of the three (checked against the real
     distinct values in data/raw/Artworks.json -- contains-trans is
     checked before the prefix checks so values like "female
-    (transwoman)" land in Transgenero, not Mujer)."""
+    (transwoman)" land in Transgender, not Woman)."""
     if not isinstance(raw, str):
         return None
     g = raw.strip().lower()
     if "trans" in g:
-        return "Transgénero"
+        return "Transgender"
     if g.startswith("female"):
-        return "Mujer"
+        return "Woman"
     if g.startswith("male"):
-        return "Hombre"
+        return "Man"
     return None
 
 
