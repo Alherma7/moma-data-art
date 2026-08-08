@@ -1,7 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 
-from src import charts, mondrian_geometry
+from src import charts, config, data, demoiselles_geometry, mondrian_geometry
 
 
 def test_assign_decades_exact_match_ranks_by_count():
@@ -78,3 +78,53 @@ def test_mondrian_treemap_labels_fill_hover_via_text_not_hovertemplate():
         assert trace.hoveron == "fills"
         assert isinstance(trace.text, str)
         assert trace.name == ""
+
+
+_DEMOISELLES_DF = data.clean_artworks(data.load_raw_data())
+
+
+def test_demoiselles_voronoi_returns_figure():
+    fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
+    assert isinstance(fig, go.Figure)
+
+
+def test_demoiselles_voronoi_hover_never_contains_a_gender_word():
+    fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
+    for trace in fig.data:
+        if trace.hoverinfo == "text" and trace.text:
+            assert "Mujer" not in trace.text
+            assert "Hombre" not in trace.text
+            assert "Transgénero" not in trace.text
+
+
+def test_demoiselles_voronoi_legend_has_three_gender_entries_with_correct_colors():
+    fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
+    legend_traces = [t for t in fig.data if t.showlegend]
+    legend_names = {t.name for t in legend_traces}
+    assert legend_names == {"Mujer", "Hombre", "Transgénero"}
+    for trace in legend_traces:
+        expected_color = config.PALETTES["demoiselles"][charts._GENDER_PALETTE_KEYS[trace.name]]
+        assert trace.marker.color == expected_color
+
+
+def test_demoiselles_voronoi_labels_fill_hover_via_text_not_hovertemplate():
+    """Same plotly.js quirk as Mondrian's fill hovers -- see
+    test_mondrian_treemap_labels_fill_hover_via_text_not_hovertemplate."""
+    fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
+    for trace in fig.data:
+        if trace.hoveron == "fills":
+            assert trace.hovertemplate is None
+
+
+def test_demoiselles_voronoi_top_ranked_cell_carries_the_top_ranked_category():
+    """Cell index 0 in demoiselles_geometry.DEMOISELLES_CELLS is the
+    category with the highest artwork count, by construction of
+    build_cells (anchors/target areas are generated in rank order). When
+    df is the same dataset the geometry was built from, index 0's hover
+    text must match the top-ranked (decade, gender) pair."""
+    fig = charts.demoiselles_voronoi(_DEMOISELLES_DF)
+    top_decade, top_gender = demoiselles_geometry.CATEGORY_ITEMS[0][0]
+    n_faces = len(demoiselles_geometry.FACE_POLYGONS)
+    first_cell_trace = fig.data[n_faces]
+    assert top_decade in first_cell_trace.text
+    assert first_cell_trace.fillcolor == config.PALETTES["demoiselles"][charts._GENDER_PALETTE_KEYS[top_gender]]

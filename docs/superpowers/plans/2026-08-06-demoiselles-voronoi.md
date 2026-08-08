@@ -1,5 +1,23 @@
 # Demoiselles Voronoi Implementation Plan
 
+## Task 5 complete (2026-08-08 session)
+
+Graduated from `notebooks/04_demoiselles_prototyping.ipynb` into
+`src/demoiselles_geometry.py` (`FACE_CONTOURS`, `generate_seed_points`,
+`classify_gender`, `person_gender_decade_counts`, `category_items`,
+`target_fracs`, `power_diagram`, `solve_weighted_voronoi`, `clip_faces`,
+`build_cells`, and the module-level `CATEGORY_ITEMS`/`DEMOISELLES_CELLS`
+built once at import time from the real cleaned dataset) and
+`src/charts.py::demoiselles_voronoi`, written fresh from the notebook's
+actual weighted-solver + face-clipping code as flagged below — not from
+this plan's Task 5 code blocks, which described the old unweighted
+mechanism. `tests/test_demoiselles_geometry.py` (15 tests) and
+additions to `tests/test_charts.py` (5 tests) bring the project to 42
+passing tests. The graduated `charts.demoiselles_voronoi(cleaned)` was
+rendered and confirmed pixel-identical to the notebook's last validated
+render. Task 6 (pointing `notebooks/02_chart_prototyping.ipynb` at the
+graduated function) is still open.
+
 ## Amendment 2 (2026-08-07 session, later)
 
 The "Amendment (2026-08-07 session)" below (data-derived cell *count*,

@@ -1,6 +1,6 @@
 import plotly.graph_objects as go
 
-from . import config, mondrian_geometry
+from . import config, demoiselles_geometry, mondrian_geometry
 
 GRID_LINE_WIDTH = 5
 
@@ -124,6 +124,86 @@ def mondrian_treemap(df):
         xaxis=dict(visible=False, range=[plot_x_min, plot_x_max]),
         yaxis=dict(visible=False, range=[plot_y_min, plot_y_max], scaleanchor="x"),
         showlegend=False,
+        margin=dict(t=20, l=0, r=0, b=0),
+    )
+    return fig
+
+
+def _polygon_traces(polygon, fillcolor, palette, hovertext=None):
+    """Renders a shapely Polygon or MultiPolygon as one or more filled
+    Plotly traces. Hover is driven by hoveron='fills' so the whole
+    interior is hoverable; plotly.js ignores hovertemplate on fill
+    hovers, so the label must be a scalar text with hoverinfo='text' (see
+    _rectangle_trace above)."""
+    geoms = polygon.geoms if polygon.geom_type == "MultiPolygon" else [polygon]
+    traces = []
+    for geom in geoms:
+        xs, ys = geom.exterior.xy
+        traces.append(go.Scatter(
+            x=list(xs), y=list(ys),
+            fill="toself", fillcolor=fillcolor,
+            line=dict(color=palette["black"], width=2),
+            mode="lines", hoveron="fills", name="",
+            text=hovertext, hoverinfo="text" if hovertext else "skip",
+            showlegend=False,
+        ))
+    return traces
+
+
+_GENDER_PALETTE_KEYS = {"Mujer": "mujer", "Hombre": "hombre", "Transgénero": "transgenero"}
+
+
+def _legend_proxy_traces(palette):
+    """Invisible marker traces used only to produce legend entries --
+    Plotly doesn't auto-generate a legend for fill='toself' traces."""
+    return [
+        go.Scatter(
+            x=[None], y=[None], mode="markers",
+            marker=dict(size=10, color=palette[palette_key]),
+            name=label, showlegend=True,
+        )
+        for label, palette_key in _GENDER_PALETTE_KEYS.items()
+    ]
+
+
+def demoiselles_voronoi(df):
+    """Voronoi cells tessellated over images/les_demoiselles_davignon.png
+    (src/demoiselles_geometry.py): a weighted (power) Voronoi diagram
+    whose cell area is fit to each (decade, gender) category's artwork
+    count, then clipped against the 5 fixed face contours so faces stay
+    undivided decoration. Unlike mondrian_treemap, color IS a data
+    encoding here -- a cell's fill color is the gender of its assigned
+    category. Cell geometry is fixed at import time
+    (demoiselles_geometry.DEMOISELLES_CELLS, solved against the full
+    cleaned dataset); df only re-ranks categories for the assignment and
+    hover text, so it should normally be the same dataset the geometry
+    was built from. Hover shows decade + count only -- gender is already
+    shown via color and the legend."""
+    palette = config.PALETTES["demoiselles"]
+    df_items = demoiselles_geometry.category_items(df)
+
+    fig = go.Figure()
+    for face in demoiselles_geometry.FACE_POLYGONS:
+        for trace in _polygon_traces(face, palette["face"], palette):
+            fig.add_trace(trace)
+
+    for i, cell in demoiselles_geometry.DEMOISELLES_CELLS.items():
+        if i >= len(df_items):
+            continue
+        (decade, gender), count = df_items[i]
+        fillcolor = palette[_GENDER_PALETTE_KEYS[gender]]
+        hovertext = f"{decade}<br>{count} obras"
+        for trace in _polygon_traces(cell, fillcolor, palette, hovertext=hovertext):
+            fig.add_trace(trace)
+
+    for trace in _legend_proxy_traces(palette):
+        fig.add_trace(trace)
+
+    fig.update_layout(
+        plot_bgcolor=palette["background"],
+        xaxis=dict(visible=False, range=[0, 1]),
+        yaxis=dict(visible=False, range=[0, 1], scaleanchor="x"),
+        showlegend=True,
         margin=dict(t=20, l=0, r=0, b=0),
     )
     return fig
